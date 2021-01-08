@@ -5,7 +5,7 @@ block_cipher = None
 
 a = Analysis(['../src/s3viewer.py'],
              binaries=[],
-             datas=[('../src/assets/*')],
+             datas=[('../src/assets/*', 'assets')],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],
