@@ -19,6 +19,7 @@ The tool uses the Amazon S3 CLI to list directory contents and display them in a
 - [aws cli](https://aws.amazon.com/cli/)
 
 **Configurations**
+
 Please run `aws configure` once and set the region name to one of the available AWS regions, for eaxmple `us-east-1`. If you want to view your own S3 bucket fill the rest of the details correctly, otherwise simply fill with some arbitrary data such as `abc`.
 
 ## Run
