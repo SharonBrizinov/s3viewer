@@ -5,6 +5,7 @@ import sys
 import subprocess
 import tempfile
 import urllib.request 
+import shutil
 from distutils.spawn import find_executable
 
 from FSNode import *
@@ -21,20 +22,26 @@ if hasattr(sys, '_MEIPASS'):
     RUNNING_DIR = sys._MEIPASS
 
 def open_dir(path):
-    if sys.platform == 'darwin':
-        subprocess.check_call(['open', '--', path])
-    elif sys.platform == 'linux2':
-        subprocess.check_call(['xdg-open', '--', path])
-    elif sys.platform == 'win32':
-        subprocess.check_call(['explorer', path])
+    try:
+        if sys.platform == 'darwin':
+            subprocess.check_call(['open', '--', path])
+        elif sys.platform == 'linux2':
+            subprocess.check_call(['xdg-open', '--', path])
+        elif sys.platform == 'win32':
+            subprocess.check_call(['explorer', path])
+    except subprocess.CalledProcessError as e:
+        pass
 
 def open_file(path):
-    if sys.platform == 'darwin':
-        subprocess.check_call(['open', path])
-    elif sys.platform == 'linux2':
-        subprocess.check_call(['xdg-open', path])
-    elif sys.platform == 'win32':
-        os.startfile(path)
+    try:
+        if sys.platform == 'darwin':
+            subprocess.check_call(['open', path])
+        elif sys.platform == 'linux2':
+            subprocess.check_call(['xdg-open', path])
+        elif sys.platform == 'win32':
+            os.startfile(path)
+    except subprocess.CalledProcessError as e:
+        pass
 
 
 class Ui_MainWindow(QObject):
@@ -332,7 +339,7 @@ class Ui_MainWindow(QObject):
         if not self.check_input_details():
             return
         # Check that aws cli works
-        if not find_executable("aws"):
+        if not find_executable("aws") and not shutil.which("aws"):
             self.show_message_box("aws cli was not found. Please make sure you have aws cli installed and configured in the PATH environment variable\nhttps://aws.amazon.com/cli/")
             return
         # Create temp dir
@@ -343,7 +350,7 @@ class Ui_MainWindow(QObject):
         command_line = "aws --no-sign-request s3 ls s3://{} --recursive > {}".format(self.current_bucket_name, self.dirlist_path)
         res = os.system(command_line)
         if res != 0:
-            self.show_message_box("Error downloading dirlist from S3 bucket. Did you run 'aws configure'? you can use 'us-east-1' as the default region")
+            self.show_message_box("Error in generating dirlist from {}. Is the name of the bucket correct? Did you run 'aws configure'?".format(self.current_bucket_name))
             return
         # Update UI
         self.populate_tree_view_with_gui(self.dirlist_path)

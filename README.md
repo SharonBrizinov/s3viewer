@@ -1,6 +1,7 @@
-# S3Viewer - Publicly Open Amazon AWS S3 Bucket Viewer
+# S3Viewer [![Build Status](https://travis-ci.com/SharonBrizinov/s3viewer.svg?branch=main)](https://travis-ci.com/SharonBrizinov/s3viewer)
+## Publicly Open Amazon AWS S3 Bucket Viewer
 
-[![Build Status](https://travis-ci.com/SharonBrizinov/s3viewer.svg?branch=main)](https://travis-ci.com/SharonBrizinov/s3viewer)
+![Icon](packaging/icons/icon_3s.jpg)
 
 `s3viewer` is a free tool for security researchers that lists the content of a publicly open s3 bucket and helps to identify leaking data. The tool allows you to view all the files on a given aws s3 bucket and download selected files and directories. The goal is to identify the owner of the bucket as quickly as possible in order to report that data is leaking from it.
 
@@ -17,9 +18,10 @@ The tool uses the Amazon S3 CLI to list directory contents and display them in a
 
 ## Setup
 **Prerequisites**
-- python3 + PyQT5
+- python3 + PyQt5
     - `python3 -m pip install PyQt5`
 - [aws cli](https://aws.amazon.com/cli/)
+	- `python3 -m pip install awscli`
 
 **Configurations**
 
