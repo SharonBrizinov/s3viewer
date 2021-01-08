@@ -33,8 +33,9 @@ exe = EXE(pyz,
           icon='./icons/icon.ico')
 
 # Package the executable file into .app if on OS X
-if sys.platform == 'darwin':
-    app = BUNDLE(exe,
-                name='s3viewer.app',
-                info_plist= { 'NSHighResolutionCapable': 'True'},
-                icon='./icons/icon.icns')
+# import sys
+# if sys.platform == 'darwin':
+#     app = BUNDLE(exe,
+#                 name='s3viewer.app',
+#                 info_plist= { 'NSHighResolutionCapable': 'True'},
+#                 icon='./icons/icon.icns')
