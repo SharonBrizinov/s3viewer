@@ -14,7 +14,11 @@ from PyQt5.QtCore import QObject, pyqtSlot
 from PyQt5.QtWidgets import QTreeWidgetItem, QApplication
 from PyQt5.QtGui import QIcon
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Get reference to running directory
+RUNNING_DIR = os.path.dirname(os.path.abspath(__file__))
+# PyInstaller - in case of PyInstaller the running directory is sys._MEIPASS
+if hasattr(sys, '_MEIPASS'):
+    RUNNING_DIR = sys._MEIPASS
 
 def open_dir(path):
     if sys.platform == 'darwin':
@@ -350,9 +354,9 @@ class Ui_MainWindow(QObject):
         tree_item = QTreeWidgetItem(tree, [node.basename, str(node.get_human_readable_size()), node.get_date_modified(), ""])
         # Set icon
         if node.is_directory:
-            tree_item.setIcon(0, QIcon(CURRENT_DIR + '/assets/folder.png'))
+            tree_item.setIcon(0, QIcon(os.path.join(RUNNING_DIR, 'assets/folder.png')))
         else:
-            tree_item.setIcon(0, QIcon(CURRENT_DIR + '/assets/file.png'))
+            tree_item.setIcon(0, QIcon(os.path.join(RUNNING_DIR, 'assets/file.png')))
         # Populate children
         for child_node in node.children.values():
             self.populate_tree_view(child_node, tree_item)
