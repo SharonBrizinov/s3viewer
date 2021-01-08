@@ -1,10 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
+### Assuming we are under packaging dir ###
 
 block_cipher = None
 
-a = Analysis(['src/s3viewer.py'],
+a = Analysis(['../src/s3viewer.py'],
              binaries=[],
-             datas=[('src/assets/*')],
+             datas=[('../src/assets/*')],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],
@@ -29,11 +30,11 @@ exe = EXE(pyz,
           upx_exclude=[],
           runtime_tmpdir=None,
           console=False,
-          icon='packaging/icons/icon.ico')
+          icon='./icons/icon.ico')
 
 # Package the executable file into .app if on OS X
 if sys.platform == 'darwin':
     app = BUNDLE(exe,
                 name='s3viewer.app',
                 info_plist= { 'NSHighResolutionCapable': 'True'},
-                icon='packaging/icons/icon.icns')
+                icon='./icons/icon.icns')
