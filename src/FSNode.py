@@ -3,6 +3,15 @@ from datetime import datetime
 
 DIRLIST_REGEX = re.compile("(\d+\-\d+\-\d+ \d+\:\d+\:\d+)\s+(\d+)\s+(.*)")
 
+def decode_data(data):
+    # Try brute forcing all popular encodings
+    for encoding in ["utf-8", "utf-16-le", "utf-16-be", "latin-1", "ascii"]:
+        try:
+            return data.decode(encoding)
+        except Exception as e:
+            pass
+    return None
+
 def parse_dirlist(dirlist_path):
     # Dirlist:
     #   2016-11-14 16:14:09          0 DirName/
@@ -10,8 +19,12 @@ def parse_dirlist(dirlist_path):
     stats = NSNodeStats()
     root_node = FSNode("", None, 0)
     # Read dirlist
-    with open(dirlist_path, "r") as f:
-        dirlist_data = f.read()
+    with open(dirlist_path, "rb") as f:
+        dirlist_data_raw = f.read()
+    dirlist_data = decode_data(dirlist_data_raw)
+    if not dirlist_data:
+        raise Exception("Could not decode dirlist. Are you sure your data is valid?")
+
     # Parse
     lines = dirlist_data.splitlines()
     for i, line in enumerate(lines):
@@ -144,11 +157,11 @@ class FSNode(object):
                     current_node.children[path_element] = new_node
 
     def get_how_many_childern_are_files(self):
-    	count_files = 0
-    	for node in self.children.values():
-    		if node.is_file:
-    			count_files += 1
-    	return count_files
+        count_files = 0
+        for node in self.children.values():
+            if node.is_file:
+                count_files += 1
+        return count_files
 
     def add_child(self, new_child):
         self.children[new_child.basename] = new_child
