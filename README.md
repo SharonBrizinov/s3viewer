@@ -13,6 +13,7 @@ The tool uses the Amazon S3 CLI to list directory contents and display them in a
 - Generate AWS S3 Bucket dirlist
 - View and interact with S3 Bucket directory hierarchy
 - Offline mode: load a pre-generated dirlist to work offline
+- Search for specific files easily
 - Cross-platform (Windows, MAC, Linux) GUI desktop application
 - Free
 
