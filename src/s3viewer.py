@@ -12,7 +12,7 @@ from FSNode import *
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QObject, pyqtSlot
-from PyQt5.QtWidgets import QTreeWidgetItem, QApplication
+from PyQt5.QtWidgets import QTreeWidgetItem, QApplication, QSpacerItem, QSizePolicy, QFrame
 from PyQt5.QtGui import QIcon
 
 # Get reference to running directory
@@ -80,6 +80,30 @@ class Ui_MainWindow(QObject):
         self.buttonOpenDir.setObjectName("buttonOpenDir")
         self.horizontalLayout_5.addWidget(self.buttonOpenDir)
         self.verticalLayout.addLayout(self.horizontalLayout_5)
+
+        # Seperator
+        self.separatorLine = QFrame()
+        self.separatorLine.setFrameShape(QFrame.HLine)
+        self.verticalLayout.addWidget(self.separatorLine)
+
+        # Search
+        self.horizontalLayout_Search = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_Search.setObjectName("horizontalLayout_Search")
+        self.labelSearch = QtWidgets.QLabel(self.centralwidget)
+        self.labelSearch.setObjectName("labelSearch")
+        self.horizontalLayout_Search.addWidget(self.labelSearch)
+        self.lineEditSearch = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEditSearch.setEnabled(True)
+        self.lineEditSearch.setObjectName("lineEditSearch")
+        self.horizontalLayout_Search.addWidget(self.lineEditSearch)
+        self.buttonSearchDo = QtWidgets.QPushButton(self.centralwidget)
+        self.buttonSearchDo.setObjectName("buttonSearchDo")
+        self.horizontalLayout_Search.addWidget(self.buttonSearchDo)
+        self.buttonSearchClear = QtWidgets.QPushButton(self.centralwidget)
+        self.buttonSearchClear.setObjectName("buttonSearchClear")
+        self.horizontalLayout_Search.addWidget(self.buttonSearchClear)
+        self.verticalLayout.addLayout(self.horizontalLayout_Search)
+
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
         self.treeWidget = QtWidgets.QTreeWidget(self.centralwidget)
@@ -112,6 +136,8 @@ class Ui_MainWindow(QObject):
         self.bucketNameButton.clicked.connect(self.button_click_download_and_process_bucket_dirlist)
         self.buttonLoadData.clicked.connect(self.button_click_process_bucket_dirlist)
         self.buttonOpenDir.clicked.connect(self.button_click_open_working_dir)
+        self.buttonSearchDo.clicked.connect(self.button_click_search_do)
+        self.buttonSearchClear.clicked.connect(self.button_click_search_clear)
         self.treeWidget.doubleClicked['QModelIndex'].connect(self.treeViewFileDoubleClicked)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
@@ -119,6 +145,8 @@ class Ui_MainWindow(QObject):
         self.selected_tree_item = None
         self.selected_tree_node = None
         self.current_bucket_name = None
+        self.search_mode = False
+
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -129,6 +157,11 @@ class Ui_MainWindow(QObject):
         self.label_3.setText(_translate("MainWindow", "Dirlist File"))
         self.buttonLoadData.setText(_translate("MainWindow", "Load"))
         self.buttonOpenDir.setText(_translate("MainWindow", "Open Dir"))
+        # Search
+        self.labelSearch.setText(_translate("MainWindow", "Search"))
+        self.buttonSearchDo.setText(_translate("MainWindow", "Search"))
+        self.buttonSearchClear.setText(_translate("MainWindow", "Clear"))
+        # Tree widget
         self.treeWidget.headerItem().setText(0, _translate("MainWindow", "Name"))
         self.treeWidget.headerItem().setText(1, _translate("MainWindow", "Size"))
         self.treeWidget.headerItem().setText(2, _translate("MainWindow", "Date Modified"))
@@ -354,6 +387,38 @@ class Ui_MainWindow(QObject):
             return
         # Update UI
         self.populate_tree_view_with_gui(self.dirlist_path)
+    
+    @pyqtSlot( )
+    def button_click_search_do(self):
+        # Hide all
+        for item in self.treeWidget.findItems("", QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive):
+            item.setHidden(True)
+            # Mark as search mode only if there are items
+            self.search_mode = True
+
+        if self.search_mode:
+            # Show only those that match the search
+            search_query = self.lineEditSearch.text()
+            flags = QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive
+            #flags |= QtCore.Qt.MatchRegExp # use regex
+            for item in self.treeWidget.findItems(search_query, flags):
+                # Walk up the chain
+                item_temp = item
+                while item_temp:
+                    item_temp.setHidden(False)
+                    item_temp = item_temp.parent()
+                    # If parent is not hidden, all the chain is visible so no need to redo
+                    if item_temp and not item_temp.isHidden():
+                        break
+    
+    @pyqtSlot( )
+    def button_click_search_clear(self):
+        self.lineEditSearch.setText("")
+        if self.search_mode:
+            self.search_mode = False
+            # Show all
+            for item in self.treeWidget.findItems("", QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive):
+                item.setHidden(False)
 
     # Populate tree view with all items
     def populate_tree_view(self, node, tree):
