@@ -2,16 +2,17 @@
 
 import os
 import sys
-import subprocess
 import tempfile
 import urllib.request 
 import shutil
 from distutils.spawn import find_executable
 
+from utils import *
 from FSNode import *
+from dirlist import *
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import QObject, pyqtSlot
+from PyQt5.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QTreeWidgetItem, QApplication, QSpacerItem, QSizePolicy, QFrame
 from PyQt5.QtGui import QIcon
 
@@ -21,27 +22,26 @@ RUNNING_DIR = os.path.dirname(os.path.abspath(__file__))
 if hasattr(sys, '_MEIPASS'):
     RUNNING_DIR = sys._MEIPASS
 
-def open_dir(path):
-    try:
-        if sys.platform == 'darwin':
-            subprocess.check_call(['open', '--', path])
-        elif sys.platform == 'linux2':
-            subprocess.check_call(['xdg-open', '--', path])
-        elif sys.platform == 'win32':
-            subprocess.check_call(['explorer', path])
-    except subprocess.CalledProcessError as e:
-        pass
 
-def open_file(path):
-    try:
-        if sys.platform == 'darwin':
-            subprocess.check_call(['open', path])
-        elif sys.platform == 'linux2':
-            subprocess.check_call(['xdg-open', path])
-        elif sys.platform == 'win32':
-            os.startfile(path)
-    except subprocess.CalledProcessError as e:
-        pass
+class DirlistWorker(QObject):
+    finished = pyqtSignal()
+    progress = pyqtSignal(FSNode)
+
+    stats = FSNodeStats()
+    root_node = FSNode("", None, 0)
+    bucket_name = None
+
+    def run(self):
+        for dirlist_line in yield_aws_dirlist(self.bucket_name):
+            node = parse_dirlist_line(dirlist_line)
+            # It's possible that new nodes will be created if one of the dirs
+            #   in the hierarchy is new. For example in case we first encounter a new
+            #   directory that we haven't processed before /new_dir/file
+            new_nodes = self.root_node.process_sub_node(node) + [node]
+            for new_node in new_nodes:
+                self.stats.process_node(new_node)
+                self.progress.emit(new_node)
+        self.finished.emit()
 
 
 class Ui_MainWindow(QObject):
@@ -146,6 +146,8 @@ class Ui_MainWindow(QObject):
         self.selected_tree_node = None
         self.current_bucket_name = None
         self.search_mode = False
+        self.dirlist_path = "/tmp/a"
+        self.list_new_nodes_to_process = []
 
 
     def retranslateUi(self, MainWindow):
@@ -264,19 +266,7 @@ class Ui_MainWindow(QObject):
         if not bucket_name:
             self.show_message_box("Please fill bucket name")
             return False
-        # We accept a couple of formats. For example:
-        #    - BUCKET_NAME
-        #    - http://BUCKET_NAME.s3.amazonaws.com
-        #    - https://BUCKET_NAME.s3-us-west-1.amazonaws.com
-        #    - BUCKET_NAME.s3.amazonaws.com
-        if ".amazonaws.com" in bucket_name:
-            bucket_name = bucket_name.replace("https://", "")
-            bucket_name = bucket_name.replace("http://", "")
-            if ".s3." in bucket_name:
-                bucket_name = bucket_name.split(".s3.amazonaws.com")[0]
-            if ".s3-" in bucket_name:
-                bucket_name = bucket_name.split(".s3-")[0]
-        self.current_bucket_name = bucket_name
+        self.current_bucket_name = extract_aws_s3_bucket_name(bucket_name)
         return True
 
     def prepare_dirs_for_download(self, node):
@@ -375,16 +365,16 @@ class Ui_MainWindow(QObject):
         if not find_executable("aws") and not shutil.which("aws"):
             self.show_message_box("aws cli was not found. Please make sure you have aws cli installed and configured in the PATH environment variable\nhttps://aws.amazon.com/cli/")
             return
-        # Create temp dir
-        dirlist_name = self.current_bucket_name + ".dirlist.txt"
-        self.working_dir = tempfile.mkdtemp()
-        self.dirlist_path = os.path.join(self.working_dir, dirlist_name)
-        # Downlaod dirlist using aws CLI
-        command_line = "aws --no-sign-request s3 ls s3://{} --recursive > {}".format(self.current_bucket_name, self.dirlist_path)
-        res = os.system(command_line)
-        if res != 0:
-            self.show_message_box("Error in generating dirlist from {}. Is the name of the bucket correct? Did you run 'aws configure'?".format(self.current_bucket_name))
-            return
+        # # Create temp dir
+        # dirlist_name = self.current_bucket_name + ".dirlist.txt"
+        # self.working_dir = tempfile.mkdtemp()
+        # self.dirlist_path = os.path.join(self.working_dir, dirlist_name)
+        # # Downlaod dirlist using aws CLI
+        # command_line = "aws --no-sign-request s3 ls s3://{} --recursive > {}".format(self.current_bucket_name, self.dirlist_path)
+        # res = os.system(command_line)
+        # if res != 0:
+        #     self.show_message_box("Error in generating dirlist from {}. Is the name of the bucket correct? Did you run 'aws configure'?".format(self.current_bucket_name))
+        #     return
         # Update UI
         self.populate_tree_view_with_gui(self.dirlist_path)
     
@@ -420,8 +410,7 @@ class Ui_MainWindow(QObject):
             for item in self.treeWidget.findItems("", QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive):
                 item.setHidden(False)
 
-    # Populate tree view with all items
-    def populate_tree_view(self, node, tree):
+    def get_tree_view_item(self, node, tree):
         # Create tree item
         tree_item = QTreeWidgetItem(tree, [node.basename, str(node.get_human_readable_size()), node.get_date_modified(), ""])
         # Set icon
@@ -429,40 +418,93 @@ class Ui_MainWindow(QObject):
             tree_item.setIcon(0, QIcon(os.path.join(RUNNING_DIR, 'assets/folder.png')))
         else:
             tree_item.setIcon(0, QIcon(os.path.join(RUNNING_DIR, 'assets/file.png')))
+        return tree_item
+
+    # Populate tree view with all items
+    def populate_tree_view(self, node, tree):
+        tree_item = self.get_tree_view_item(node, tree)
         # Populate children
         for child_node in node.children.values():
             self.populate_tree_view(child_node, tree_item)
 
-    def populate_tree_view_with_gui(self, dirlist_path):
-        # Update UI
-        self.lineEditDirlist.setText(dirlist_path)
-        self.treeWidget.clear()
-        # Parse dirlist and populate tree view
-        if dirlist_path:
-            self.labelStatus.setText("Loading data from {}".format(dirlist_path))
-            try:
-                self.root_node, nodes_stats = parse_dirlist(dirlist_path)
-            except Exception as e:
-                self.show_message_box(str(e))
-                return
-            # Update UI
-            self.populate_tree_view(self.root_node, self.treeWidget)
-            self.labelStatistics.setText("Total items: {} (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(nodes_stats.count_total,
-                nodes_stats.count_dirs,
-                nodes_stats.count_files,
-                nodes_stats.get_human_readable_size(),
-                nodes_stats.date_oldest,
-                nodes_stats.date_newest))
-        else:
-            self.root_node = None
-            self.treeWidget.clear()
-            self.labelStatistics.setText("")
-            self.current_bucket_name = None
-        # Clear
+    def dirlist_report_progress(self, node, force_update=False):
+        if node:
+            self.list_new_nodes_to_process.append(node)
+
+        if len(self.list_new_nodes_to_process) % 3000:
+            # Process batch
+            for node in self.list_new_nodes_to_process:
+                # TODO: Write to file too
+                tree_view_item = self.get_tree_view_item(node, node.parent.gui_node)
+                node.gui_node = tree_view_item
+                self.labelStatus.setText("Currently processing: {}..".format(node.full_path))
+                print(node.full_path)
+            self.list_new_nodes_to_process.clear()
+
+    def dirlist_thread_finished(self):
+        self.dirlist_report_progress(None, force_update=True)
         self.labelStatus.setText("Working dir: {}".format(self.working_dir))
         self.progressBar.setValue(0)
         self.selected_tree_item = None
         self.selected_tree_node = None
+
+
+    def populate_tree_view_with_gui(self, dirlist_path):
+        self.treeWidget.clear()
+
+        # Step 2: Create a QThread object
+        self.thread = QThread()
+        # Step 3: Create a worker object
+        self.worker = DirlistWorker()
+        self.worker.bucket_name = self.current_bucket_name
+        # Add root node to gui
+        root_tree_item = self.get_tree_view_item(self.worker.root_node, self.treeWidget)
+        self.worker.root_node.gui_node = root_tree_item
+        self.root_node = self.worker.root_node
+
+        # Step 4: Move worker to the thread
+        self.worker.moveToThread(self.thread)
+        # Step 5: Connect signals and slots
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.worker.progress.connect(self.dirlist_report_progress)
+        # Step 6: Start the thread
+        self.thread.start()
+
+        # Final resets
+        self.thread.finished.connect(self.dirlist_thread_finished)
+
+        # Update UI
+        # self.lineEditDirlist.setText(dirlist_path)
+        # self.treeWidget.clear()
+        # # Parse dirlist and populate tree view
+        # if dirlist_path:
+        #     self.labelStatus.setText("Loading data from {}".format(dirlist_path))
+        #     try:
+        #         self.root_node, nodes_stats = parse_dirlist(dirlist_path)
+        #     except Exception as e:
+        #         self.show_message_box(str(e))
+        #         return
+        #     # Update UI
+        #     self.populate_tree_view(self.root_node, self.treeWidget)
+        #     self.labelStatistics.setText("Total items: {} (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(nodes_stats.count_total,
+        #         nodes_stats.count_dirs,
+        #         nodes_stats.count_files,
+        #         nodes_stats.get_human_readable_size(),
+        #         nodes_stats.date_oldest,
+        #         nodes_stats.date_newest))
+        # else:
+        #     self.root_node = None
+        #     self.treeWidget.clear()
+        #     self.labelStatistics.setText("")
+        #     self.current_bucket_name = None
+        # Clear
+        # self.labelStatus.setText("Working dir: {}".format(self.working_dir))
+        # self.progressBar.setValue(0)
+        # self.selected_tree_item = None
+        # self.selected_tree_node = None
 
 
 
