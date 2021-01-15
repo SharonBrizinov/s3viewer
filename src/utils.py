@@ -1,6 +1,26 @@
 import sys
+import os
 import subprocess
+from urllib.parse import urlparse
 
+from PyQt5 import QtWidgets
+
+# Get reference to running directory
+RUNNING_DIR = os.path.dirname(os.path.abspath(__file__))
+# PyInstaller - in case of PyInstaller the running directory is sys._MEIPASS
+if hasattr(sys, '_MEIPASS'):
+    RUNNING_DIR = sys._MEIPASS
+
+def get_asset_path(relative_path):
+    return os.path.join(RUNNING_DIR, relative_path)
+
+def show_message_box(msg, alert_type=QtWidgets.QMessageBox.Warning):
+    msg_box = QtWidgets.QMessageBox()
+    msg_box.setText(msg)
+    msg_box.setIcon(alert_type)
+    msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
+    msg_box.setDefaultButton(QtWidgets.QMessageBox.Ok)
+    ret = msg_box.exec_()
 
 def open_dir(path):
     try:
@@ -24,17 +44,6 @@ def open_file(path):
     except subprocess.CalledProcessError as e:
         pass
 
-def extract_aws_s3_bucket_name(bucket_name):
-    # We accept a couple of formats. For example:
-    #    - BUCKET_NAME
-    #    - http://BUCKET_NAME.s3.amazonaws.com
-    #    - https://BUCKET_NAME.s3-us-west-1.amazonaws.com
-    #    - BUCKET_NAME.s3.amazonaws.com
-    if ".amazonaws.com" in bucket_name:
-        bucket_name = bucket_name.replace("https://", "")
-        bucket_name = bucket_name.replace("http://", "")
-        if ".s3." in bucket_name:
-            bucket_name = bucket_name.split(".s3.amazonaws.com")[0]
-        if ".s3-" in bucket_name:
-            bucket_name = bucket_name.split(".s3-")[0]
-    return bucket_name
+def extract_domain(url):
+    domain = urlparse('url').netloc
+    return domain or url

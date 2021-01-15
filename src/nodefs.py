@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 
-DIRLIST_REGEX = re.compile("(\d+\-\d+\-\d+ \d+\:\d+\:\d+)\s+(\d+)\s+(.*)")
+from consts import DIRLIST_REGEX
 
 def decode_data(data):
     # Try brute forcing all popular encodings
@@ -101,7 +101,7 @@ class FSNode(object):
         self.is_file = not self.is_directory
         self.is_downloaded = False
         self.download_path = None
-        self.gui_node = None
+        self.item_view = None # GUI Representation
 
     def __repr__(self):
         if self.is_file:
