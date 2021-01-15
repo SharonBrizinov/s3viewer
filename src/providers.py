@@ -5,13 +5,15 @@ from urllib.parse import urlparse
 
 from utils import show_message_box
 
+
 def find_provider_class_by_url(url):
     if S3StorageProvider.is_provider(url):
         return S3StorageProvider
     return None
 
-
 class StorageProvider():
+    NODE_BATCH_UPDATE_COUNT = 1
+
     def __init__(self, url):
         self.url = url
 
@@ -36,6 +38,8 @@ class StorageProvider():
 
 
 class S3StorageProvider(StorageProvider):
+    NODE_BATCH_UPDATE_COUNT = 1000
+
     @staticmethod
     def is_provider(url):
         url = url.lower()

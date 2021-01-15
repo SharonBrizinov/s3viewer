@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 from PyQt5 import QtWidgets
 
+
 # Get reference to running directory
 RUNNING_DIR = os.path.dirname(os.path.abspath(__file__))
 # PyInstaller - in case of PyInstaller the running directory is sys._MEIPASS

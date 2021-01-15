@@ -1,19 +1,17 @@
-# -*- coding: utf-8 -*-
-
 import os
 import sys
 import urllib.request 
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
+from PyQt5.QtWidgets import QTreeWidgetItem, QApplication, QSpacerItem, QSizePolicy, QFrame
+from PyQt5.QtGui import QIcon
 
 from utils import *
 from nodefs import *
 from dirlist import *
 from consts import *
 from providers import *
-
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
-from PyQt5.QtWidgets import QTreeWidgetItem, QApplication, QSpacerItem, QSizePolicy, QFrame
-from PyQt5.QtGui import QIcon
 
 
 class Mode():
@@ -495,7 +493,7 @@ class Ui_MainWindow(QObject):
             self.labelStatus.setText("Downloading {}...".format(self.node_processing.full_path))
         elif self.mode.is_dirlist_loaded:
             self.labelStatus.setText("Working dir: {}".format(self.working_dir))
-            self.labelStatistics.setText("Showing items {} (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(self.nodes_stats.count_total, self.nodes_stats.count_dirs, self.nodes_stats.count_files, self.nodes_stats.get_human_readable_size(), self.nodes_stats.date_oldest or "?", self.nodes_stats.date_newest or "?"))
+            self.labelStatistics.setText("Showing {} items (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(self.nodes_stats.count_total, self.nodes_stats.count_dirs, self.nodes_stats.count_files, self.nodes_stats.get_human_readable_size(), self.nodes_stats.date_oldest or "?", self.nodes_stats.date_newest or "?"))
             self.progressBar.setValue(0)
             self.buttonSearchDo.setEnabled(True)
             self.buttonSearchClear.setEnabled(True)
@@ -545,13 +543,14 @@ class Ui_MainWindow(QObject):
     def dirlist_report_progress(self, node, force_update=False):
         if node:
             self.list_new_nodes_to_process.append(node)
-        if force_update or len(self.list_new_nodes_to_process) % NODE_BATCH_UPDATE_COUNT:
+        if force_update or len(self.list_new_nodes_to_process) % self.current_provider.NODE_BATCH_UPDATE_COUNT:
             # Process batch
             for node in self.list_new_nodes_to_process:
                 self.create_tree_view_item(node, node.parent.item_view)
             # Save last processed node and clear list
             if self.list_new_nodes_to_process:
                 self.node_processing = self.list_new_nodes_to_process[-1]
+                self.update_ui()
                 self.list_new_nodes_to_process.clear()
 
     def dirlist_thread_finished(self):

@@ -4,6 +4,7 @@ from datetime import datetime
 from utils import decode_data
 from consts import DIRLIST_REGEX
 
+
 def parse_dirlist_line(line):
     parsed_line = DIRLIST_REGEX.findall(line)
     if parsed_line:
