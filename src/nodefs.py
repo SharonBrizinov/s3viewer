@@ -1,16 +1,8 @@
 import re
 from datetime import datetime
 
+from utils import decode_data
 from consts import DIRLIST_REGEX
-
-def decode_data(data):
-    # Try brute forcing all popular encodings
-    for encoding in ["utf-8", "utf-16-le", "utf-16-be", "latin-1", "ascii"]:
-        try:
-            return data.decode(encoding)
-        except Exception as e:
-            pass
-    return None
 
 def parse_dirlist_line(line):
     parsed_line = DIRLIST_REGEX.findall(line)

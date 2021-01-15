@@ -47,3 +47,12 @@ def open_file(path):
 def extract_domain(url):
     domain = urlparse('url').netloc
     return domain or url
+
+def decode_data(data):
+    # Try brute forcing all popular encodings
+    for encoding in ["utf-8", "utf-16-le", "utf-16-be", "latin-1", "ascii"]:
+        try:
+            return data.decode(encoding)
+        except Exception as e:
+            pass
+    return None

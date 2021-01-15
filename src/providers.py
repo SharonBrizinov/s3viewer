@@ -1,6 +1,9 @@
 import shutil
+import subprocess
 from distutils.spawn import find_executable
 from urllib.parse import urlparse
+
+from utils import show_message_box
 
 def find_provider_class_by_url(url):
     if S3StorageProvider.is_provider(url):
@@ -26,6 +29,9 @@ class StorageProvider():
         return self.url
 
     def yield_dirlist(self):
+        pass
+
+    def get_default_error_message(self):
         pass
 
 
@@ -63,7 +69,10 @@ class S3StorageProvider(StorageProvider):
         popen.stdout.close()
         return_code = popen.wait()
         if return_code:
-            raise subprocess.CalledProcessError(return_code, cmd)
+            raise subprocess.CalledProcessError(return_code, aws_cmd)
+
+    def get_default_error_message(self):
+        return "Could not get data from '{}' bucket. Most likely the bucket is private or you didn't run 'aws configure' yet".format(self.hostname())
 
     def hostname(self):
         return self._extract_aws_s3_bucket_name()

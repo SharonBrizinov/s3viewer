@@ -22,6 +22,12 @@ class Mode():
     is_downloading_file = False
     is_searching = False
 
+    def init(self):
+        self.is_dirlist_loaded = False
+        self.is_getting_dirlist = False
+        self.is_downloading_file = False
+        self.is_searching = False
+
     def starting_downloading(self):
         self.is_downloading_file = True
 
@@ -116,7 +122,7 @@ class Ui_MainWindow(QObject):
         # Button load dirlist offline
         self.buttonLoadDirlistOffline = QtWidgets.QPushButton(self.centralwidget)
         self.buttonLoadDirlistOffline.setObjectName("buttonLoadDirlistOffline")
-        self.buttonLoadDirlistOffline.setText("Load Offline")
+        self.buttonLoadDirlistOffline.setText("Load Dirlist Offline")
         self.horizontalLayout_2.addWidget(self.buttonLoadDirlistOffline)
         # Button open directory
         self.buttonOpenDir = QtWidgets.QPushButton(self.centralwidget)
@@ -320,10 +326,11 @@ class Ui_MainWindow(QObject):
         if not self.current_url:
             show_message_box("Please fill url or bucket name")
             return False
-        self.current_provider = find_provider_class_by_url(self.current_url)
-        if not self.current_provider:
+        current_provider_class = find_provider_class_by_url(self.current_url)
+        if not current_provider_class:
             show_message_box("Could not find provider for '{}'".format(self.current_url))
             return False
+        self.current_provider = current_provider_class(self.current_url)
         if not self.current_provider.check():
             return False
         return True
@@ -339,7 +346,8 @@ class Ui_MainWindow(QObject):
             self.progressBar.setValue(download_percentage)
             # Finished downloading
             if self.progressBar.value() >= 100:
-                pass
+                self.mode.finished_downloading()
+                self.update_ui()
             QApplication.processEvents()
 
     def prepare_dirs_for_download(self, node):
@@ -405,18 +413,24 @@ class Ui_MainWindow(QObject):
         
     @pyqtSlot( )
     def button_click_process_dirlist(self):
+        # Clear UI
+        self.init_ui()
+        # Get dirlist
         file_dialog_options = QtWidgets.QFileDialog.Options()
         file_dialog_options |= QtWidgets.QFileDialog.DontUseNativeDialog
         file_dialog_title = "Select dirlist file"
         file_path, _ = QtWidgets.QFileDialog.getOpenFileName(None, file_dialog_title, "", "All Files (*)", options=file_dialog_options)
-        # Update working dir
-        self.dirlist_path = file_path
-        self.working_dir = os.path.dirname(os.path.abspath(file_path))
-        # Update UI
-        self.populate_tree_view_with_gui(file_path)
+        if file_path:
+            # Update working dir
+            self.dirlist_path = file_path
+            self.working_dir = os.path.dirname(os.path.abspath(file_path))
+            # Update UI
+            self.populate_tree_view_with_gui(file_path)
 
     @pyqtSlot( )
     def button_click_download_and_process_bucket_dirlist(self):
+        # Clear UI
+        self.init_ui()
         # Check bucket details
         if self.check_input_details():
             self.populate_tree_view_with_gui(self.dirlist_path)
@@ -463,8 +477,12 @@ class Ui_MainWindow(QObject):
     ################## UI Updates ##################
     ################################################
     def update_ui(self):
+        # By default we want to present the current working dir
         if self.dirlist_path:
             self.lineEditDirlistPath.setText(self.dirlist_path)
+        else:
+            self.lineEditDirlistPath.setText("")
+
         if self.mode.is_searching:
             self.labelStatus.setText("Showing results for: '{}'".format(self.lineEditSearch.text()))
             self.progressBar.setValue(0)
@@ -472,18 +490,47 @@ class Ui_MainWindow(QObject):
             if self.node_processing:
                 self.labelStatus.setText("Currently processing: {}..".format(self.node_processing.full_path))
             self.progressBar.setValue(0)
-            self.labelStatistics.setText("Showing {} items (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(self.nodes_stats.count_total, self.nodes_stats.count_dirs, self.nodes_stats.count_files, self.nodes_stats.get_human_readable_size(), self.nodes_stats.date_oldest, self.nodes_stats.date_newest))
+            self.labelStatistics.setText("Showing {} items (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(self.nodes_stats.count_total, self.nodes_stats.count_dirs, self.nodes_stats.count_files, self.nodes_stats.get_human_readable_size(), self.nodes_stats.date_oldest or "?", self.nodes_stats.date_newest or "?"))
         elif self.mode.is_downloading_file:
             self.labelStatus.setText("Downloading {}...".format(self.node_processing.full_path))
         elif self.mode.is_dirlist_loaded:
             self.labelStatus.setText("Working dir: {}".format(self.working_dir))
-            self.labelStatistics.setText("Showing items {} (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(self.nodes_stats.count_total, self.nodes_stats.count_dirs, self.nodes_stats.count_files, self.nodes_stats.get_human_readable_size(), self.nodes_stats.date_oldest, self.nodes_stats.date_newest))
+            self.labelStatistics.setText("Showing items {} (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(self.nodes_stats.count_total, self.nodes_stats.count_dirs, self.nodes_stats.count_files, self.nodes_stats.get_human_readable_size(), self.nodes_stats.date_oldest or "?", self.nodes_stats.date_newest or "?"))
             self.progressBar.setValue(0)
-            # Enable search
             self.buttonSearchDo.setEnabled(True)
             self.buttonSearchClear.setEnabled(True)
             self.lineEditSearch.setEnabled(True)
+        else:
+            # Init
+            self.labelStatus.setText("")
+            self.lineEditDirlistPath.setText("")
+            self.lineEditSearch.setText("")
+            self.progressBar.setValue(0)
+            self.buttonSearchDo.setEnabled(False)
+            self.buttonSearchClear.setEnabled(False)
+            self.lineEditSearch.setEnabled(False)
+            self.treeWidget.clear()
 
+    def init_ui(self):
+        ### Init all variables
+        # Dirlist
+        self.working_dir = None
+        self.dirlist_path = None
+        self.list_new_nodes_to_process.clear()
+        # Selected items
+        self.selected_tree_item = None
+        self.selected_tree_node = None
+        self.node_processing = None
+        # URL
+        self.current_url = None
+        self.current_provider = None
+        # Nodes
+        self.nodes_stats = None
+        self.root_node = None
+        ### Update mode
+        self.mode.init()
+        ### Update UI
+        self.update_ui()
 
     ################################################
     ################## Dirlist #####################
@@ -508,17 +555,24 @@ class Ui_MainWindow(QObject):
                 self.list_new_nodes_to_process.clear()
 
     def dirlist_thread_finished(self):
-        # One last batch processing
-        self.dirlist_report_progress(None, force_update=True)
-        # Update status
-        self.mode.finished_dirlist()
-        self.update_ui()
+        # If finished successfully
+        if not self.worker_dirlist.has_errors:
+            # One last batch processing
+            self.dirlist_report_progress(None, force_update=True)
+            # Update status
+            self.mode.finished_dirlist()
+            self.update_ui()
+        else:
+            # Error were raised while getting dirlist, clear all UI
+            self.init_ui()
+
+    def dirlist_worker_report_error(self, exception_str):
+        show_message_box(exception_str)
+        self.thread_dirlist.terminate()
+        # Clear all
+        self.init_ui()
 
     def populate_tree_view_with_gui(self, dirlist_path=None):
-        # Clear all
-        self.selected_tree_item = None
-        self.selected_tree_node = None
-        self.treeWidget.clear()
         # Init
         self.setup_root_node()
         self.thread_dirlist = QThread()
@@ -535,6 +589,7 @@ class Ui_MainWindow(QObject):
         self.worker_dirlist.finished.connect(self.thread_dirlist.quit)
         self.worker_dirlist.finished.connect(self.worker_dirlist.deleteLater)
         self.worker_dirlist.progress.connect(self.dirlist_report_progress)
+        self.worker_dirlist.report_error.connect(self.dirlist_worker_report_error)
         # Start the thread
         self.thread_dirlist.start()
         # Update status

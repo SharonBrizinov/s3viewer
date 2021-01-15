@@ -1,3 +1,5 @@
+import re
+
 NODE_BATCH_UPDATE_COUNT = 3000
 
 ### Dirlist
