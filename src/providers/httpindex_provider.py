@@ -288,7 +288,11 @@ def yield_fetch_dir(url, max_recurse_level=HTTP_MAX_RECURSE_LEVEL, recurse_level
         return
     queue_process = []
     recurse_level += 1
-    cwd, listing = fetch_listing(url)
+    try:
+        cwd, listing = fetch_listing(url)
+    except Exception as e:
+        # Skip bad entries
+        return
     # Fix cwd to support inner starting point
     #   cwd shouldn't start with /, but it should end with one
     if cwd:
@@ -310,7 +314,7 @@ def yield_fetch_dir(url, max_recurse_level=HTTP_MAX_RECURSE_LEVEL, recurse_level
 
 
 class HTTPIndexStorageProvider(StorageProvider):
-    NODE_BATCH_UPDATE_COUNT = 40
+    NODE_BATCH_UPDATE_COUNT = 100
 
     @staticmethod
     def is_provider(url):
