@@ -136,7 +136,17 @@ class FSNode(object):
             return None
 
     def get_is_directory(self):
-        return self.size == 0 and self.full_path.endswith("/")
+        return self.size == 0 and self.full_path.endswith("/") or\
+            self.size == 4096 and "." not in self.basename # this is some kind of heuristic check for linux based systems
+
+    # Check if node exists yet
+    def is_node_exists_yet(self, node):
+        current_node = self
+        path_list = node.path_list
+        for i, path_element in enumerate(path_list):
+            if path_element in current_node.children:
+                current_node = current_node.children[path_element]
+        return current_node.full_path == node.full_path
 
     def process_sub_node(self, new_node):
         new_nodes = []

@@ -1,2 +1,5 @@
 PyQt5
 PyInstaller
+beautifulsoup4
+html5lib
+dateutil
