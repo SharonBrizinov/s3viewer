@@ -5,41 +5,7 @@ from distutils.spawn import find_executable
 from urllib.parse import urlparse
 
 from utils import show_message_box
-
-
-def find_provider_class_by_url(url):
-    if S3StorageProvider.is_provider(url):
-        return S3StorageProvider
-    return None
-
-class StorageProvider():
-    NODE_BATCH_UPDATE_COUNT = 1
-
-    def __init__(self, url):
-        self.url = url
-        self.should_stop = False
-
-    @staticmethod
-    def is_provider(url):
-        return False
-
-    def check(self):
-        return True
-
-    def get_download_url(self, relative_path):
-        return relative_path
-
-    def hostname(self):
-        return self.url
-
-    def yield_dirlist(self):
-        pass
-
-    def get_default_error_message(self):
-        pass
-
-    def stop(self):
-        self.should_stop = True
+from providers.base_provider import StorageProvider
 
 class S3StorageProvider(StorageProvider):
     NODE_BATCH_UPDATE_COUNT = 1000
@@ -52,7 +18,7 @@ class S3StorageProvider(StorageProvider):
         if scheme and "http" in scheme:
             return ".amazonaws.com" in url
         # If we don't have HTTP we assume it's just a AWS S3 bucket name
-        return url
+        return True
 
     # We accept a couple of formats. For example:
     #    - BUCKET_NAME

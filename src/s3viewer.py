@@ -11,7 +11,7 @@ from utils import *
 from nodefs import *
 from dirlist import *
 from consts import *
-from providers import *
+from providers.providers import *
 
 
 class Mode():
@@ -195,7 +195,7 @@ class Ui_MainWindow(QObject):
         # Label statistics
         self.labelStatistics = QtWidgets.QLabel(self.centralwidget)
         self.labelStatistics.setObjectName("labelStatistics")
-        self.labelStatistics.setText("Please load storage provider")
+        self.labelStatistics.setText("Please load a storage provider")
         self.verticalLayout.addWidget(self.labelStatistics)
         # Progress bar ￿
         self.progressBar = QtWidgets.QProgressBar(self.centralwidget)
@@ -369,16 +369,12 @@ class Ui_MainWindow(QObject):
         if totalsize > 0: 
             download_percentage = readed_data * 100 / totalsize 
             self.progressBar.setValue(download_percentage)
-            # Finished downloading
-            if self.progressBar.value() >= 100:
-                self.mode.finished_downloading()
-                self.update_ui()
             QApplication.processEvents()
 
     def prepare_dirs_for_download(self, node):
         path_download = node.full_path.lstrip("/") # remove the first / if any
         # Make dirs
-        path_save_to = os.path.join(self.working_dir, self.current_url, path_download)
+        path_save_to = os.path.join(self.working_dir, self.current_provider.hostname(), path_download)
         path_save_to_dir = os.path.dirname(path_save_to)
         try:
             os.makedirs(path_save_to_dir, exist_ok=True)
@@ -402,7 +398,6 @@ class Ui_MainWindow(QObject):
             # Download
             urllib.request.urlretrieve(url_download_encoded, path_save_to, self.update_progress_bar)
             # Update node
-            self.node_processing = node
             self.node_processing.is_downloaded = True
             self.node_processing.download_path = path_save_to
         except Exception as e:
@@ -413,12 +408,15 @@ class Ui_MainWindow(QObject):
     def download_node_with_gui_update(self, node):
         if not self.selected_tree_node or not self.selected_tree_node.is_file:
             return
+        self.node_processing = node
         # Update UI
         self.mode.starting_downloading()
+        self.update_ui()
         # Download
         if self.download_node(node):
             self.selected_tree_item.setText(3, "   V ")
         self.mode.finished_downloading()
+        self.update_ui()
 
     ################################################
     ################## Actions #####################
