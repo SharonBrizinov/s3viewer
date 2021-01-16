@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+import codecs
 from distutils.spawn import find_executable
 from urllib.parse import urlparse
 
@@ -16,6 +17,7 @@ class StorageProvider():
 
     def __init__(self, url):
         self.url = url
+        self.should_stop = False
 
     @staticmethod
     def is_provider(url):
@@ -36,6 +38,8 @@ class StorageProvider():
     def get_default_error_message(self):
         pass
 
+    def stop(self):
+        self.should_stop = True
 
 class S3StorageProvider(StorageProvider):
     NODE_BATCH_UPDATE_COUNT = 1000
@@ -67,11 +71,19 @@ class S3StorageProvider(StorageProvider):
 
     def yield_dirlist(self):
         aws_cmd = "aws --no-sign-request s3 ls s3://{aws_bucket} --recursive".format(aws_bucket=self.hostname())
-        popen = subprocess.Popen(aws_cmd.split(" "), stdout=subprocess.PIPE, universal_newlines=True)
-        for stdout_line in iter(popen.stdout.readline, ""):
+        proc = subprocess.Popen(aws_cmd.split(" "), stdout=subprocess.PIPE)
+        # we want to work with strings (UTF-8) instead of bytes
+        proc.stdout = codecs.getreader('utf-8')(proc.stdout)
+        for stdout_line in iter(proc.stdout.readline, ""):
+            # Stop
+            if self.should_stop:
+                break
             yield stdout_line
-        popen.stdout.close()
-        return_code = popen.wait()
+        proc.stdout.close()
+        # Make sure it's dead
+        if self.should_stop:
+            proc.terminate()
+        return_code = proc.wait()
         if return_code:
             raise subprocess.CalledProcessError(return_code, aws_cmd)
 

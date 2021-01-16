@@ -17,6 +17,7 @@ from providers import *
 class Mode():
     is_dirlist_loaded = False
     is_getting_dirlist = False
+    is_stopped_dirlist = False
     is_downloading_file = False
     is_searching = False
 
@@ -25,6 +26,7 @@ class Mode():
         self.is_getting_dirlist = False
         self.is_downloading_file = False
         self.is_searching = False
+        self.is_stopped_dirlist = False
 
     def starting_downloading(self):
         self.is_downloading_file = True
@@ -41,14 +43,21 @@ class Mode():
     def starting_dirlist(self):
         self.is_dirlist_loaded = False
         self.is_getting_dirlist = True
+        self.is_stopped_dirlist = False
 
     def finished_dirlist(self):
         self.is_dirlist_loaded = True
         self.is_getting_dirlist = False
 
+    def stopped_dirlist(self):
+        self.is_dirlist_loaded = True
+        self.is_getting_dirlist = False
+        self.is_stopped_dirlist = True
+
     def no_dirlist(self):
         self.is_dirlist_loaded = False
         self.is_getting_dirlist = False
+        self.is_stopped_dirlist = False
 
 class Ui_MainWindow(QObject):
     def __init__(self):
@@ -174,6 +183,10 @@ class Ui_MainWindow(QObject):
         self.treeWidget.headerItem().setText(1, "Size")
         self.treeWidget.headerItem().setText(2, "Date Modified")
         self.treeWidget.headerItem().setText(3, "Downloaded")
+        self.treeWidget.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
+        self.treeWidget.header().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
+        self.treeWidget.header().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)
+        self.treeWidget.header().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)
         self.treeWidget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.horizontalLayout_4.addWidget(self.treeWidget)
         #####################################
@@ -182,18 +195,31 @@ class Ui_MainWindow(QObject):
         # Label statistics
         self.labelStatistics = QtWidgets.QLabel(self.centralwidget)
         self.labelStatistics.setObjectName("labelStatistics")
-        self.labelStatistics.setText("Please load S3 bucket")
+        self.labelStatistics.setText("Please load storage provider")
         self.verticalLayout.addWidget(self.labelStatistics)
         # Progress bar ￿
         self.progressBar = QtWidgets.QProgressBar(self.centralwidget)
         self.progressBar.setProperty("value", 0)
         self.progressBar.setObjectName("progressBar")
         self.verticalLayout.addWidget(self.progressBar)
+        #####################################
+
+        ### Horizontal Layout 5 - Status ###
+        self.horizontalLayout_5 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_5.setObjectName("horizontalLayout_5")
+        self.verticalLayout.addLayout(self.horizontalLayout_5)
         # Label status
         self.labelStatus = QtWidgets.QLabel(self.centralwidget)
         self.labelStatus.setText("")
         self.labelStatus.setObjectName("labelStatus")
-        self.verticalLayout.addWidget(self.labelStatus)
+        self.horizontalLayout_5.addWidget(self.labelStatus)
+        # Button stop
+        self.buttonStop = QtWidgets.QPushButton(self.centralwidget)
+        self.buttonStop.setText("Stop")
+        self.buttonStop.setObjectName("buttonStop")
+        self.buttonStop.setEnabled(False)
+        self.buttonStop.setMaximumWidth(80);
+        self.horizontalLayout_5.addWidget(self.buttonStop)
         #####################################
         MainWindow.setCentralWidget(self.centralwidget)
 
@@ -205,6 +231,7 @@ class Ui_MainWindow(QObject):
         self.buttonSearchClear.clicked.connect(self.button_click_search_clear)
         self.treeWidget.doubleClicked['QModelIndex'].connect(self.tree_view_item_double_clicked)
         self.treeWidget.customContextMenuRequested.connect(self.menu_context_tree_view_widget)
+        self.buttonStop.clicked.connect(self.button_click_stop)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
         #####################################
 
@@ -448,17 +475,20 @@ class Ui_MainWindow(QObject):
         if self.mode.is_searching:
             # Show only those that match the search
             search_query = self.lineEditSearch.text()
-            flags = QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive
-            #flags |= QtCore.Qt.MatchRegExp # use regex
-            for item in self.treeWidget.findItems(search_query, flags):
-                # Walk up the chain
-                item_temp = item
-                while item_temp:
-                    item_temp.setHidden(False)
-                    item_temp = item_temp.parent()
-                    # If parent is not hidden, all the chain is visible so no need to redo
-                    if item_temp and not item_temp.isHidden():
-                        break
+            if search_query:
+                flags = QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive
+                #flags |= QtCore.Qt.MatchRegExp # use regex
+                for item in self.treeWidget.findItems(search_query, flags):
+                    # Walk up the chain
+                    item_temp = item
+                    while item_temp:
+                        item_temp.setHidden(False)
+                        item_temp = item_temp.parent()
+                        # If parent is not hidden, all the chain is visible so no need to redo
+                        if item_temp and not item_temp.isHidden():
+                            break
+            else:
+                self.button_click_search_clear()
         self.update_ui()
     
     @pyqtSlot( )
@@ -470,6 +500,12 @@ class Ui_MainWindow(QObject):
             for item in self.treeWidget.findItems("", QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive):
                 item.setHidden(False)
         self.update_ui()
+
+    @pyqtSlot( )
+    def button_click_stop(self):
+        if self.mode.is_getting_dirlist and self.worker_dirlist:
+            self.worker_dirlist.stop()
+            self.mode.stopped_dirlist()
 
     ################################################
     ################## UI Updates ##################
@@ -489,15 +525,20 @@ class Ui_MainWindow(QObject):
                 self.labelStatus.setText("Currently processing: {}..".format(self.node_processing.full_path))
             self.progressBar.setValue(0)
             self.labelStatistics.setText("Showing {} items (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(self.nodes_stats.count_total, self.nodes_stats.count_dirs, self.nodes_stats.count_files, self.nodes_stats.get_human_readable_size(), self.nodes_stats.date_oldest or "?", self.nodes_stats.date_newest or "?"))
+            self.buttonStop.setEnabled(True)
         elif self.mode.is_downloading_file:
             self.labelStatus.setText("Downloading {}...".format(self.node_processing.full_path))
         elif self.mode.is_dirlist_loaded:
             self.labelStatus.setText("Working dir: {}".format(self.working_dir))
-            self.labelStatistics.setText("Showing {} items (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(self.nodes_stats.count_total, self.nodes_stats.count_dirs, self.nodes_stats.count_files, self.nodes_stats.get_human_readable_size(), self.nodes_stats.date_oldest or "?", self.nodes_stats.date_newest or "?"))
+            is_stopped_text = ""
+            if self.mode.is_stopped_dirlist:
+                is_stopped_text = "(STOPPED) "
+            self.labelStatistics.setText(is_stopped_text + "Showing {} items (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(self.nodes_stats.count_total, self.nodes_stats.count_dirs, self.nodes_stats.count_files, self.nodes_stats.get_human_readable_size(), self.nodes_stats.date_oldest or "?", self.nodes_stats.date_newest or "?"))
             self.progressBar.setValue(0)
             self.buttonSearchDo.setEnabled(True)
             self.buttonSearchClear.setEnabled(True)
             self.lineEditSearch.setEnabled(True)
+            self.buttonStop.setEnabled(False)
         else:
             # Init
             self.labelStatus.setText("")
@@ -508,6 +549,7 @@ class Ui_MainWindow(QObject):
             self.buttonSearchClear.setEnabled(False)
             self.lineEditSearch.setEnabled(False)
             self.treeWidget.clear()
+            self.buttonStop.setEnabled(False)
 
     def init_ui(self):
         ### Init all variables

@@ -98,9 +98,9 @@ class FSNode(object):
 
     def __repr__(self):
         if self.is_file:
-            return "Name: {}, Size: {}, Created: {}  ".format(self.basename, self.get_human_readable_size(), self.date_modified)
+            return "Name: {}, Size: {}, Created: {}  ".format(self.basename, self.get_human_readable_size(), self.date_modified or "?")
         else:
-            return "Name: {}, Created: {}, Children: {}  ".format(self.basename, self.date_modified, len(self.children))
+            return "Name: {}, Created: {}, No. Children: {}  ".format(self.basename, self.date_modified  or "?", len(self.children))
 
     def get_path_list(self):
         # Edge case for root node ("/")
