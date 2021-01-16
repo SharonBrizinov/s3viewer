@@ -20,10 +20,12 @@ The tool uses the Amazon S3 CLI to list directory contents and display them in a
 
 ## Setup
 **Prerequisites**
+
 - python3 + PyQt5
-    - `python3 -m pip install PyQt5`
 - [aws cli](https://aws.amazon.com/cli/)
-	- `python3 -m pip install awscli`
+
+Simply run `python3 -m pip install -r packaging/requirements.txt`
+
 
 **Configurations**
 
