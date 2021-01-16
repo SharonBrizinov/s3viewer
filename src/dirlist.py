@@ -58,70 +58,75 @@ class DirlistWorker(QObject):
     def stop(self):
         self.should_stop = True
 
+    # Read from a an offline dirlist file
+    def offline_mode_read_data(self):
+        dirlist_lines = []
+        try:
+            with open(self.pre_generated_dirlist_path, "rb") as f:
+                dirlist_data = decode_data(f.read())
+                if not dirlist_data:
+                    raise Exception("Could not decode dirlist. Are you sure your data is valid?")
+                dirlist_lines = dirlist_data.splitlines()
+        except Exception as e:
+            self.has_errors = True
+            self.report_error.emit(str(e))
+        return dirlist_lines
+
     # Get dirlist
     def run(self):
         counter_iter = 1 # to avoid sleeping the first time
-        # Offline mode
+        dirlist_file = None
+
+        # Get iterator
         if self.is_offline:
-            try:
-                with open(self.pre_generated_dirlist_path, "rb") as f:
-                    dirlist_data_raw = f.read()
-                    dirlist_data = decode_data(dirlist_data_raw)
-                    if not dirlist_data:
-                        raise Exception("Could not decode dirlist. Are you sure your data is valid?")
-                    # Parse
-                    dirlist_lines = dirlist_data.splitlines()
-                    for dirlist_line in dirlist_lines:
-                        # Stop processing
-                        if self.should_stop:
-                            break
-                        # GUI responsiveness
-                        if counter_iter % self.counter_items_before_sleep == 0:
-                            time.sleep(self.seconds_sleep)
-                        ### Process data
-                        # Parse line
-                        node = parse_dirlist_line(dirlist_line)
-                        # It's possible that new nodes will be created if one of the dirs
-                        #   in the hierarchy is new. For example in case we first encounter a new
-                        #   directory that we haven't processed before /new_dir/file
-                        new_nodes = self.root_node.process_sub_node(node) + [node]
-                        for new_node in new_nodes:
-                            self.nodes_stats.process_node(new_node)
-                            self.progress.emit(new_node)
-                        counter_iter += 1
-            except Exception as e:
-                self.has_errors = True
-                self.report_error.emit(str(e))
-                return
-        # Online mode
+            data_iterator = iter(self.offline_mode_read_data())
         else:
+            data_iterator = iter(self.provider.yield_dirlist())
+
+        # Check for errors
+        if self.has_errors:
+            return
+
+        try:
             dirlist_file = open(self.dirlist_path, "wb")
-            try:
-                for dirlist_line in self.provider.yield_dirlist():
-                    # Should stop?
-                    if self.should_stop:
-                        self.provider.stop()
-                        break
-                    # GUI responsiveness
-                    if counter_iter % self.counter_items_before_sleep == 0:
-                        time.sleep(self.seconds_sleep)
-                    # Write to dirlist file
+
+            for dirlist_line in data_iterator:
+                # Should stop?
+                if self.should_stop:
+                    self.provider.stop()
+                    break
+
+                # GUI responsiveness
+                if counter_iter % self.counter_items_before_sleep == 0:
+                    time.sleep(self.seconds_sleep)
+
+                # Write to dirlist file if online
+                if not self.is_offline:
                     dirlist_file.write(dirlist_line.encode())
-                    ### Process data
-                    # Parse line
-                    node = parse_dirlist_line(dirlist_line)
-                    # It's possible that new nodes will be created if one of the dirs
-                    #   in the hierarchy is new. For example in case we first encounter a new
-                    #   directory that we haven't processed before /new_dir/file
-                    new_nodes = self.root_node.process_sub_node(node) + [node]
-                    for new_node in new_nodes:
-                        self.nodes_stats.process_node(new_node)
-                        self.progress.emit(new_node)
-                    counter_iter += 1 # must be in the outter loop
-            except subprocess.CalledProcessError as e:
-                self.has_errors = True
-                self.report_error.emit(self.provider.get_default_error_message())
-                return
-            finally:
+
+                ### Process data ###
+                # Parse line
+                node = parse_dirlist_line(dirlist_line)
+
+                # Make sure we don't have it yet
+                if self.root_node.is_node_exists_yet(node):
+                    continue
+
+                # It's possible that new nodes will be created if one of the dirs
+                #   in the hierarchy is new. For example in case we first encounter a new
+                #   directory that we haven't processed before /new_dir/file
+                new_nodes = self.root_node.process_sub_node(node) + [node]
+                for new_node in new_nodes:
+                    self.nodes_stats.process_node(new_node)
+                    self.progress.emit(new_node)
+
+                counter_iter += 1 # must be in the outter loop
+        except Exception as e:
+            self.has_errors = True
+            self.report_error.emit(str(e))
+            return
+        finally:
+            if not self.is_offline:
                 dirlist_file.close()
+
         self.finished.emit()

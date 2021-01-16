@@ -15,8 +15,13 @@ class S3StorageProvider(StorageProvider):
         url = url.lower()
         scheme = urlparse(url).scheme
         # If it's a full url and we must make sure we have amazonaws domain
-        if scheme and "http" in scheme:
-            return ".amazonaws.com" in url
+        if scheme:
+            if "http" in scheme:
+                return ".amazonaws.com" in url
+            elif "s3" in scheme:
+                return True
+            else:
+                return False
         # If we don't have HTTP we assume it's just a AWS S3 bucket name
         return True
 
@@ -68,4 +73,6 @@ class S3StorageProvider(StorageProvider):
                 bucket_name = bucket_name.split(".s3.amazonaws.com")[0]
             if ".s3-" in bucket_name:
                 bucket_name = bucket_name.split(".s3-")[0]
+        elif bucket_name.startswith("s3://"):
+            bucket_name = bucket_name.replace("s3://", "")
         return bucket_name

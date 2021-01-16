@@ -1,6 +1,5 @@
 import os
 import sys
-import urllib.request 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
@@ -104,7 +103,7 @@ class Ui_MainWindow(QObject):
         # Line edit url
         self.lineEditUrl = QtWidgets.QLineEdit(self.centralwidget)
         self.lineEditUrl.setObjectName("lineEditUrl")
-        self.lineEditUrl.setPlaceholderText("mybucket")
+        self.lineEditUrl.setPlaceholderText("FTP, HTTP, S3 Bucket")
         self.horizontalLayout.addWidget(self.lineEditUrl)
         # Bucket get dirlist
         self.buttonGetDirlist = QtWidgets.QPushButton(self.centralwidget)
@@ -363,11 +362,9 @@ class Ui_MainWindow(QObject):
     ################################################
     ############### Download files #################
     ################################################
-    def update_progress_bar(self, blocknum, blocksize, totalsize):
-        ## Calculate the progress
-        readed_data = blocknum * blocksize 
-        if totalsize > 0: 
-            download_percentage = readed_data * 100 / totalsize 
+    def update_progress_bar(self, count, blockSize, totalSize):
+        if totalSize > 0:
+            download_percentage = ((count*blockSize) * 100) / totalSize
             self.progressBar.setValue(download_percentage)
             QApplication.processEvents()
 
@@ -393,10 +390,10 @@ class Ui_MainWindow(QObject):
         # Prepare download url
         path_download = node.full_path.lstrip("/") # remove the first / if any
         url_download = self.current_provider.get_download_url(path_download)
-        url_download_encoded = urllib.parse.quote(url_download, safe=':/')
         try:
             # Download
-            urllib.request.urlretrieve(url_download_encoded, path_save_to, self.update_progress_bar)
+            # TODO: move to a thread
+            download_file(url=url_download, filename=path_save_to, report_hook=self.update_progress_bar)
             # Update node
             self.node_processing.is_downloaded = True
             self.node_processing.download_path = path_save_to
@@ -583,7 +580,10 @@ class Ui_MainWindow(QObject):
     def dirlist_report_progress(self, node, force_update=False):
         if node:
             self.list_new_nodes_to_process.append(node)
-        if force_update or len(self.list_new_nodes_to_process) % self.current_provider.NODE_BATCH_UPDATE_COUNT:
+        # In case we don't have a loaded provider (such as working offline from a dirlist file)
+        node_batch_update_count = self.current_provider.NODE_BATCH_UPDATE_COUNT if self.current_provider else DEFAULT_NODE_BATCH_UPDATE_COUNT
+        # Process batch
+        if force_update or len(self.list_new_nodes_to_process) % node_batch_update_count == 0:
             # Process batch
             for node in self.list_new_nodes_to_process:
                 self.create_tree_view_item(node, node.parent.item_view)

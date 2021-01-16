@@ -9,13 +9,12 @@ import urllib.parse
 import bs4
 
 from utils import show_message_box
+from consts import HTTP_MAX_RECURSE_LEVEL, USER_AGENT
 from providers.base_provider import StorageProvider
 
 ##################################################################################
 ### Most of the code here is from https://github.com/gumblex/htmllisting-parser ##
 ##################################################################################
-MAX_RECURSE_LEVEL = 50
-USER_AGENT = "Mozilla/5.0 (Linux; Android 4.0.4; Galaxy Nexus Build/IMM76B) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.133 Mobile Safari/535.19"
 HEADERS = {"User-Agent": USER_AGENT}
 
 RE_ISO8601 = re.compile(r'\d{4}-\d+-\d+T\d+:\d{2}:\d{2}Z')
@@ -258,7 +257,7 @@ def fetch_listing(url, timeout=30):
 def is_directory(entry):
     return entry.description == "Directory" or (not entry.description and not entry.size)
 
-def print_fetch_dir(url, max_recurse_level=MAX_RECURSE_LEVEL, recurse_level=0):
+def print_fetch_dir(url, max_recurse_level=HTTP_MAX_RECURSE_LEVEL, recurse_level=0):
     if recurse_level == 0:
         print(url)
         print("-----------------------")
@@ -284,7 +283,7 @@ def print_fetch_dir(url, max_recurse_level=MAX_RECURSE_LEVEL, recurse_level=0):
             print_fetch_dir(url=url + f.name, max_recurse_level=max_recurse_level, recurse_level=recurse_level)
 
 # BFS and DFS mixture - output entire content of each directory met
-def yield_fetch_dir(url, max_recurse_level=MAX_RECURSE_LEVEL, recurse_level=0):
+def yield_fetch_dir(url, max_recurse_level=HTTP_MAX_RECURSE_LEVEL, recurse_level=0):
     if recurse_level == max_recurse_level:
         return
     queue_process = []
@@ -334,14 +333,17 @@ class HTTPIndexStorageProvider(StorageProvider):
         return '{uri.scheme}://{uri.netloc}/{relative_path}'.format(uri=uri_obj, relative_path=relative_path)
 
     def yield_dirlist(self):
-        for dirlist_line in yield_fetch_dir(self.url):
+        url = self.url
+        if not self.url.endswith("/"):
+           url = self.url + "/"
+        for dirlist_line in yield_fetch_dir(url):
             # Stop
             if self.should_stop:
                 break
             yield dirlist_line
 
     def get_default_error_message(self):
-        return "Could not parse Apache/nginx-style directory listing. Are you sure it's a valid HTTP dir index?".format(self.hostname())
+        return "Could not parse Apache/nginx-style directory listing. Are you sure it's a valid HTTP dir index?"
 
     def hostname(self):
         return urllib.parse.urlparse(self.url).netloc
@@ -351,7 +353,7 @@ class HTTPIndexStorageProvider(StorageProvider):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='DirLister IndexOf/')
     parser.add_argument('-u', '--url', dest='url', help='URL')
-    parser.add_argument('--max_level', dest='max_level', type=int, default=MAX_RECURSE_LEVEL, help='Max recurse level')
+    parser.add_argument('--max_level', dest='max_level', type=int, default=HTTP_MAX_RECURSE_LEVEL, help='Max recurse level')
 
     args = parser.parse_args()
     print_fetch_dir(url=args.url, max_recurse_level=args.max_level)
