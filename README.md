@@ -14,6 +14,7 @@ The tool uses the Amazon S3 CLI to list directory contents and display them in a
 - View and interact with S3 Bucket directory hierarchy
 - Offline mode: load a pre-generated dirlist to work offline
 - Search for specific files easily
+- Supporting multiple open storage instances including FTP (anonymous access), HTTP Index (Apache/nginx-style directory listing), AWS S3 Bucket
 - Cross-platform (Windows, MAC, Linux) GUI desktop application
 - Free
 
