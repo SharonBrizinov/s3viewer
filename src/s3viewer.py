@@ -1,174 +1,243 @@
-# -*- coding: utf-8 -*-
-
 import os
 import sys
-import subprocess
-import tempfile
 import urllib.request 
-import shutil
-from distutils.spawn import find_executable
-
-from FSNode import *
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import QObject, pyqtSlot
+from PyQt5.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QTreeWidgetItem, QApplication, QSpacerItem, QSizePolicy, QFrame
 from PyQt5.QtGui import QIcon
 
-# Get reference to running directory
-RUNNING_DIR = os.path.dirname(os.path.abspath(__file__))
-# PyInstaller - in case of PyInstaller the running directory is sys._MEIPASS
-if hasattr(sys, '_MEIPASS'):
-    RUNNING_DIR = sys._MEIPASS
+from utils import *
+from nodefs import *
+from dirlist import *
+from consts import *
+from providers import *
 
-def open_dir(path):
-    try:
-        if sys.platform == 'darwin':
-            subprocess.check_call(['open', '--', path])
-        elif sys.platform == 'linux2':
-            subprocess.check_call(['xdg-open', '--', path])
-        elif sys.platform == 'win32':
-            subprocess.check_call(['explorer', path])
-    except subprocess.CalledProcessError as e:
-        pass
 
-def open_file(path):
-    try:
-        if sys.platform == 'darwin':
-            subprocess.check_call(['open', path])
-        elif sys.platform == 'linux2':
-            subprocess.check_call(['xdg-open', path])
-        elif sys.platform == 'win32':
-            os.startfile(path)
-    except subprocess.CalledProcessError as e:
-        pass
+class Mode():
+    is_dirlist_loaded = False
+    is_getting_dirlist = False
+    is_stopped_dirlist = False
+    is_downloading_file = False
+    is_searching = False
 
+    def init(self):
+        self.is_dirlist_loaded = False
+        self.is_getting_dirlist = False
+        self.is_downloading_file = False
+        self.is_searching = False
+        self.is_stopped_dirlist = False
+
+    def starting_downloading(self):
+        self.is_downloading_file = True
+
+    def finished_downloading(self):
+        self.is_downloading_file = False
+
+    def starting_search(self):
+        self.is_searching = True
+
+    def finished_search(self):
+        self.is_searching = False
+
+    def starting_dirlist(self):
+        self.is_dirlist_loaded = False
+        self.is_getting_dirlist = True
+        self.is_stopped_dirlist = False
+
+    def finished_dirlist(self):
+        self.is_dirlist_loaded = True
+        self.is_getting_dirlist = False
+
+    def stopped_dirlist(self):
+        self.is_dirlist_loaded = True
+        self.is_getting_dirlist = False
+        self.is_stopped_dirlist = True
+
+    def no_dirlist(self):
+        self.is_dirlist_loaded = False
+        self.is_getting_dirlist = False
+        self.is_stopped_dirlist = False
 
 class Ui_MainWindow(QObject):
+    def __init__(self):
+        super().__init__()
+        # Dirlist
+        self.thread_dirlist = None
+        self.worker_dirlist = None
+        self.working_dir = None
+        self.dirlist_path = None
+        self.list_new_nodes_to_process = [] # Batch processing
+        # Selected items
+        self.selected_tree_item = None
+        self.selected_tree_node = None
+        self.node_processing = None
+        # URL
+        self.current_url = None
+        self.current_provider = None
+        # Mode
+        self.mode = Mode()
+        # Nodes
+        self.nodes_stats = None
+        self.root_node = None
+
     def setupUi(self, MainWindow):
+        # Main windows
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(686, 615)
+        MainWindow.setWindowTitle("Storage File Viewer")
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
+        # Vertical layout
         self.verticalLayout = QtWidgets.QVBoxLayout(self.centralwidget)
         self.verticalLayout.setObjectName("verticalLayout")
+        #####################################
+
+        ### Horizontal Layout 1 - URL###
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
-        self.label = QtWidgets.QLabel(self.centralwidget)
-        self.label.setObjectName("label")
-        self.horizontalLayout.addWidget(self.label)
-        self.lineEdit_bucket_name = QtWidgets.QLineEdit(self.centralwidget)
-        self.lineEdit_bucket_name.setObjectName("lineEdit_bucket_name")
-        self.horizontalLayout.addWidget(self.lineEdit_bucket_name)
-        self.bucketNameButton = QtWidgets.QPushButton(self.centralwidget)
-        self.bucketNameButton.setObjectName("bucketNameButton")
-        self.horizontalLayout.addWidget(self.bucketNameButton)
         self.verticalLayout.addLayout(self.horizontalLayout)
-        self.horizontalLayout_5 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_5.setObjectName("horizontalLayout_5")
-        self.label_3 = QtWidgets.QLabel(self.centralwidget)
-        self.label_3.setObjectName("label_3")
-        self.horizontalLayout_5.addWidget(self.label_3)
-        self.lineEditDirlist = QtWidgets.QLineEdit(self.centralwidget)
-        self.lineEditDirlist.setEnabled(True)
-        self.lineEditDirlist.setObjectName("lineEditDirlist")
-        self.horizontalLayout_5.addWidget(self.lineEditDirlist)
-        self.buttonLoadData = QtWidgets.QPushButton(self.centralwidget)
-        self.buttonLoadData.setObjectName("buttonLoadData")
-        self.horizontalLayout_5.addWidget(self.buttonLoadData)
+        # Label url
+        self.labelUrl = QtWidgets.QLabel(self.centralwidget)
+        self.labelUrl.setObjectName("labelUrl")
+        self.labelUrl.setText("Name / URL")
+        self.horizontalLayout.addWidget(self.labelUrl)
+        # Line edit url
+        self.lineEditUrl = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEditUrl.setObjectName("lineEditUrl")
+        self.lineEditUrl.setPlaceholderText("mybucket")
+        self.horizontalLayout.addWidget(self.lineEditUrl)
+        # Bucket get dirlist
+        self.buttonGetDirlist = QtWidgets.QPushButton(self.centralwidget)
+        self.buttonGetDirlist.setObjectName("buttonGetDirlist")
+        self.buttonGetDirlist.setText("Get Dirlist")
+        self.horizontalLayout.addWidget(self.buttonGetDirlist)
+        #####################################
+
+        ### Horizontal Layout 2 - Dirlist path###
+        self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
+        self.verticalLayout.addLayout(self.horizontalLayout_2)
+        # Label dirlist path
+        self.labelDirlistPath = QtWidgets.QLabel(self.centralwidget)
+        self.labelDirlistPath.setObjectName("labelDirlistPath")
+        self.labelDirlistPath.setText("Dirlist File")
+        self.horizontalLayout_2.addWidget(self.labelDirlistPath)
+        # Label dirlist path
+        self.lineEditDirlistPath = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEditDirlistPath.setObjectName("lineEditDirlistPath")
+        self.horizontalLayout_2.addWidget(self.lineEditDirlistPath)
+        # Button load dirlist offline
+        self.buttonLoadDirlistOffline = QtWidgets.QPushButton(self.centralwidget)
+        self.buttonLoadDirlistOffline.setObjectName("buttonLoadDirlistOffline")
+        self.buttonLoadDirlistOffline.setText("Load Dirlist Offline")
+        self.horizontalLayout_2.addWidget(self.buttonLoadDirlistOffline)
+        # Button open directory
         self.buttonOpenDir = QtWidgets.QPushButton(self.centralwidget)
         self.buttonOpenDir.setObjectName("buttonOpenDir")
-        self.horizontalLayout_5.addWidget(self.buttonOpenDir)
-        self.verticalLayout.addLayout(self.horizontalLayout_5)
+        self.buttonOpenDir.setText("Open Dir")
+        self.horizontalLayout_2.addWidget(self.buttonOpenDir)
+        #####################################
 
-        # Seperator
+        # Separator
         self.separatorLine = QFrame()
         self.separatorLine.setFrameShape(QFrame.HLine)
         self.verticalLayout.addWidget(self.separatorLine)
+        #####################################
 
-        # Search
-        self.horizontalLayout_Search = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_Search.setObjectName("horizontalLayout_Search")
+        ### Horizontal Layout 3 - ￿Search ###
+        self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_3.setObjectName("horizontalLayout_3")
+        self.verticalLayout.addLayout(self.horizontalLayout_3)
+        # Label search
         self.labelSearch = QtWidgets.QLabel(self.centralwidget)
         self.labelSearch.setObjectName("labelSearch")
-        self.horizontalLayout_Search.addWidget(self.labelSearch)
+        self.labelSearch.setText("Search")
+        self.horizontalLayout_3.addWidget(self.labelSearch)
+        # Line edit search
         self.lineEditSearch = QtWidgets.QLineEdit(self.centralwidget)
-        self.lineEditSearch.setEnabled(True)
         self.lineEditSearch.setObjectName("lineEditSearch")
-        self.horizontalLayout_Search.addWidget(self.lineEditSearch)
+        self.lineEditSearch.setEnabled(False)
+        self.horizontalLayout_3.addWidget(self.lineEditSearch)
+        # Button search
         self.buttonSearchDo = QtWidgets.QPushButton(self.centralwidget)
         self.buttonSearchDo.setObjectName("buttonSearchDo")
-        self.horizontalLayout_Search.addWidget(self.buttonSearchDo)
+        self.buttonSearchDo.setText("Search")
+        self.buttonSearchDo.setEnabled(False)
+        self.horizontalLayout_3.addWidget(self.buttonSearchDo)
+        # Button clear search
         self.buttonSearchClear = QtWidgets.QPushButton(self.centralwidget)
         self.buttonSearchClear.setObjectName("buttonSearchClear")
-        self.horizontalLayout_Search.addWidget(self.buttonSearchClear)
-        self.verticalLayout.addLayout(self.horizontalLayout_Search)
+        self.buttonSearchClear.setText("Clear")
+        self.buttonSearchClear.setEnabled(False)
+        self.horizontalLayout_3.addWidget(self.buttonSearchClear)
+        #####################################
 
-        self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
+        ### Horizontal Layout 4 - Tree view ###
+        self.horizontalLayout_4 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_4.setObjectName("horizontalLayout_4")
+        self.verticalLayout.addLayout(self.horizontalLayout_4)
+        # Tree widget
         self.treeWidget = QtWidgets.QTreeWidget(self.centralwidget)
         self.treeWidget.setObjectName("treeWidget")
         self.treeWidget.headerItem().setText(0, "Name")
-        self.horizontalLayout_2.addWidget(self.treeWidget)
-        self.verticalLayout.addLayout(self.horizontalLayout_2)
+        self.treeWidget.headerItem().setText(1, "Size")
+        self.treeWidget.headerItem().setText(2, "Date Modified")
+        self.treeWidget.headerItem().setText(3, "Downloaded")
+        self.treeWidget.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
+        self.treeWidget.header().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
+        self.treeWidget.header().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)
+        self.treeWidget.header().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)
+        self.treeWidget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.horizontalLayout_4.addWidget(self.treeWidget)
+        #####################################
+
+        ### More items ###
+        # Label statistics
         self.labelStatistics = QtWidgets.QLabel(self.centralwidget)
-        self.labelStatistics.setText("Please load S3 bucket")
         self.labelStatistics.setObjectName("labelStatistics")
+        self.labelStatistics.setText("Please load storage provider")
         self.verticalLayout.addWidget(self.labelStatistics)
+        # Progress bar ￿
         self.progressBar = QtWidgets.QProgressBar(self.centralwidget)
         self.progressBar.setProperty("value", 0)
         self.progressBar.setObjectName("progressBar")
         self.verticalLayout.addWidget(self.progressBar)
+        #####################################
+
+        ### Horizontal Layout 5 - Status ###
+        self.horizontalLayout_5 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_5.setObjectName("horizontalLayout_5")
+        self.verticalLayout.addLayout(self.horizontalLayout_5)
+        # Label status
         self.labelStatus = QtWidgets.QLabel(self.centralwidget)
         self.labelStatus.setText("")
         self.labelStatus.setObjectName("labelStatus")
-        self.verticalLayout.addWidget(self.labelStatus)
+        self.horizontalLayout_5.addWidget(self.labelStatus)
+        # Button stop
+        self.buttonStop = QtWidgets.QPushButton(self.centralwidget)
+        self.buttonStop.setText("Stop")
+        self.buttonStop.setObjectName("buttonStop")
+        self.buttonStop.setEnabled(False)
+        self.buttonStop.setMaximumWidth(80);
+        self.horizontalLayout_5.addWidget(self.buttonStop)
+        #####################################
         MainWindow.setCentralWidget(self.centralwidget)
-        self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 686, 22))
-        self.menubar.setObjectName("menubar")
-        MainWindow.setMenuBar(self.menubar)
-        self.statusbar = QtWidgets.QStatusBar(MainWindow)
-        self.statusbar.setObjectName("statusbar")
-        MainWindow.setStatusBar(self.statusbar)
 
-        self.retranslateUi(MainWindow)
-        self.bucketNameButton.clicked.connect(self.button_click_download_and_process_bucket_dirlist)
-        self.buttonLoadData.clicked.connect(self.button_click_process_bucket_dirlist)
+        ### Connect functions ###
+        self.buttonGetDirlist.clicked.connect(self.button_click_download_and_process_bucket_dirlist)
+        self.buttonLoadDirlistOffline.clicked.connect(self.button_click_process_dirlist)
         self.buttonOpenDir.clicked.connect(self.button_click_open_working_dir)
         self.buttonSearchDo.clicked.connect(self.button_click_search_do)
         self.buttonSearchClear.clicked.connect(self.button_click_search_clear)
-        self.treeWidget.doubleClicked['QModelIndex'].connect(self.treeViewFileDoubleClicked)
-        QtCore.QMetaObject.connectSlotsByName(MainWindow)
-
-        self.working_dir = None
-        self.selected_tree_item = None
-        self.selected_tree_node = None
-        self.current_bucket_name = None
-        self.search_mode = False
-
-
-    def retranslateUi(self, MainWindow):
-        _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "Amazon S3 File Viewer"))
-        self.label.setText(_translate("MainWindow", "Bucket"))
-        self.lineEdit_bucket_name.setPlaceholderText(_translate("MainWindow", "my_bucket_name"))
-        self.bucketNameButton.setText(_translate("MainWindow", "Get Dirlist"))
-        self.label_3.setText(_translate("MainWindow", "Dirlist File"))
-        self.buttonLoadData.setText(_translate("MainWindow", "Load"))
-        self.buttonOpenDir.setText(_translate("MainWindow", "Open Dir"))
-        # Search
-        self.labelSearch.setText(_translate("MainWindow", "Search"))
-        self.buttonSearchDo.setText(_translate("MainWindow", "Search"))
-        self.buttonSearchClear.setText(_translate("MainWindow", "Clear"))
-        # Tree widget
-        self.treeWidget.headerItem().setText(0, _translate("MainWindow", "Name"))
-        self.treeWidget.headerItem().setText(1, _translate("MainWindow", "Size"))
-        self.treeWidget.headerItem().setText(2, _translate("MainWindow", "Date Modified"))
-        self.treeWidget.headerItem().setText(3, _translate("MainWindow", "Downloaded"))
-        self.treeWidget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.treeWidget.doubleClicked['QModelIndex'].connect(self.tree_view_item_double_clicked)
         self.treeWidget.customContextMenuRequested.connect(self.menu_context_tree_view_widget)
+        self.buttonStop.clicked.connect(self.button_click_stop)
+        QtCore.QMetaObject.connectSlotsByName(MainWindow)
+        #####################################
 
+    ################################################
+    ######### Menu context in tree widget ##########
+    ################################################
     # Menu when right-click on a tree view item
     def menu_context_tree_view_widget(self, point):
         index = self.treeWidget.indexAt(point)
@@ -232,26 +301,15 @@ class Ui_MainWindow(QObject):
         dir_path = os.path.dirname(file_path)
         open_dir(dir_path)
 
-    def show_message_box(self, msg, alert_type=QtWidgets.QMessageBox.Warning):
-        msg_box = QtWidgets.QMessageBox()
-        msg_box.setText(msg)
-        msg_box.setIcon(alert_type)
-        msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
-        msg_box.setDefaultButton(QtWidgets.QMessageBox.Ok)
-        ret = msg_box.exec_()
+    ################################################
+    ############# Tree item / nodes ################
+    ################################################
+    def setup_root_node(self):
+        self.nodes_stats = FSNodeStats()
+        self.root_node = FSNode("", None, 0)
+        self.create_tree_view_item(self.root_node, self.treeWidget)
 
-    def update_progress_bar(self, blocknum, blocksize, totalsize):
-        ## calculate the progress 
-        readed_data = blocknum * blocksize 
-        if totalsize > 0: 
-            download_percentage = readed_data * 100 / totalsize 
-            self.progressBar.setValue(download_percentage)
-            # Clear
-            if self.progressBar.value() >= 100:
-                self.progressBar.setValue(0)
-                self.labelStatus.setText("")
-            QApplication.processEvents()
-
+    # Get full path of a tree item
     def get_tree_item_full_path(self, item):
         out = item.text(0)
         parent = item.parent()
@@ -259,35 +317,73 @@ class Ui_MainWindow(QObject):
             out = self.get_tree_item_full_path(parent) + "/" + out
         return out
 
+    # Node to tree item
+    def create_tree_view_item(self, node, tree_parent):
+        # Create tree item
+        tree_item = QTreeWidgetItem(tree_parent, [node.basename, str(node.get_human_readable_size()), node.get_date_modified(), ""])
+        # Set icon
+        if node.is_directory:
+            tree_item.setIcon(0, QIcon(get_asset_path('assets/folder.png')))
+        else:
+            tree_item.setIcon(0, QIcon(get_asset_path('assets/file.png')))
+        node.item_view = tree_item
+        return tree_item
+
+    # Tree item to node
+    def tree_item_to_node(self, tree_item):
+        selected_node = None
+        # Get full path from item
+        item_full_path = self.get_tree_item_full_path(tree_item)
+        item_full_path = item_full_path.lstrip("/")
+        # Find node from path
+        try:
+            selected_node = self.root_node.get_sub_node(item_full_path)
+        except Exception as e:
+            show_message_box(str(e))
+        return selected_node
+
+    ################################################
+    #################### Input #####################
+    ################################################
+    # Check url input and extract details
     def check_input_details(self):
-        bucket_name = self.lineEdit_bucket_name.text().strip()
-        if not bucket_name:
-            self.show_message_box("Please fill bucket name")
+        self.current_url = self.lineEditUrl.text().strip()
+        if not self.current_url:
+            show_message_box("Please fill url or bucket name")
             return False
-        # We accept a couple of formats. For example:
-        #    - BUCKET_NAME
-        #    - http://BUCKET_NAME.s3.amazonaws.com
-        #    - https://BUCKET_NAME.s3-us-west-1.amazonaws.com
-        #    - BUCKET_NAME.s3.amazonaws.com
-        if ".amazonaws.com" in bucket_name:
-            bucket_name = bucket_name.replace("https://", "")
-            bucket_name = bucket_name.replace("http://", "")
-            if ".s3." in bucket_name:
-                bucket_name = bucket_name.split(".s3.amazonaws.com")[0]
-            if ".s3-" in bucket_name:
-                bucket_name = bucket_name.split(".s3-")[0]
-        self.current_bucket_name = bucket_name
+        current_provider_class = find_provider_class_by_url(self.current_url)
+        if not current_provider_class:
+            show_message_box("Could not find provider for '{}'".format(self.current_url))
+            return False
+        self.current_provider = current_provider_class(self.current_url)
+        if not self.current_provider.check():
+            return False
         return True
+
+    ################################################
+    ############### Download files #################
+    ################################################
+    def update_progress_bar(self, blocknum, blocksize, totalsize):
+        ## Calculate the progress
+        readed_data = blocknum * blocksize 
+        if totalsize > 0: 
+            download_percentage = readed_data * 100 / totalsize 
+            self.progressBar.setValue(download_percentage)
+            # Finished downloading
+            if self.progressBar.value() >= 100:
+                self.mode.finished_downloading()
+                self.update_ui()
+            QApplication.processEvents()
 
     def prepare_dirs_for_download(self, node):
         path_download = node.full_path.lstrip("/") # remove the first / if any
         # Make dirs
-        path_save_to = os.path.join(self.working_dir, self.current_bucket_name, path_download)
+        path_save_to = os.path.join(self.working_dir, self.current_url, path_download)
         path_save_to_dir = os.path.dirname(path_save_to)
         try:
             os.makedirs(path_save_to_dir, exist_ok=True)
         except Exception as e:
-            self.show_message_box(str(e))
+            show_message_box(str(e))
             return None
         return path_save_to
 
@@ -298,19 +394,19 @@ class Ui_MainWindow(QObject):
         path_save_to = self.prepare_dirs_for_download(node)
         if not path_save_to:
             return False
+        # Prepare download url
         path_download = node.full_path.lstrip("/") # remove the first / if any
-        # Prepare URL
-        #   http://BUCKETNAME.s3.amazonaws.com/FILE
-        #   http://BUCKETNAME.s3.REGION.amazonaws.com/FILE
-        url_download = "http://{}.s3.amazonaws.com/{}".format(self.current_bucket_name, path_download)
+        url_download = self.current_provider.get_download_url(path_download)
         url_download_encoded = urllib.parse.quote(url_download, safe=':/')
         try:
             # Download
             urllib.request.urlretrieve(url_download_encoded, path_save_to, self.update_progress_bar)
-            node.is_downloaded = True
-            node.download_path = path_save_to
+            # Update node
+            self.node_processing = node
+            self.node_processing.is_downloaded = True
+            self.node_processing.download_path = path_save_to
         except Exception as e:
-            self.show_message_box(url_download + ":\n" + str(e))
+            show_message_box(url_download + ":\n" + str(e))
             return False
         return True
 
@@ -318,27 +414,17 @@ class Ui_MainWindow(QObject):
         if not self.selected_tree_node or not self.selected_tree_node.is_file:
             return
         # Update UI
-        self.labelStatus.setText("Downloading {}...".format(node.full_path))
+        self.mode.starting_downloading()
         # Download
         if self.download_node(node):
             self.selected_tree_item.setText(3, "   V ")
-        self.progressBar.setValue(0)
-        self.labelStatus.setText("")
+        self.mode.finished_downloading()
 
-    def tree_item_to_node(self, tree_item):
-        selected_node = None
-        # Get full path from item
-        item_full_path = self.get_tree_item_full_path(tree_item)
-        item_full_path = item_full_path.lstrip("/")
-        # Find node from path
-        try:
-            selected_node = self.root_node.get_sub_node(item_full_path)
-        except Exception as e:
-            self.show_message_box(str(e))
-        return selected_node
-
+    ################################################
+    ################## Actions #####################
+    ################################################
     @pyqtSlot( )
-    def treeViewFileDoubleClicked(self):
+    def tree_view_item_double_clicked(self):
         # Get selected item
         selected_items = self.treeWidget.selectedItems()
         if len(selected_items) < 1:
@@ -347,19 +433,32 @@ class Ui_MainWindow(QObject):
             return 
         self.selected_tree_item = selected_items[0]
         self.selected_tree_node = self.tree_item_to_node(self.selected_tree_item)
+        # Download node
         self.download_node_with_gui_update(self.selected_tree_node)
         
     @pyqtSlot( )
-    def button_click_process_bucket_dirlist(self):
+    def button_click_process_dirlist(self):
+        # Clear UI
+        self.init_ui()
+        # Get dirlist
         file_dialog_options = QtWidgets.QFileDialog.Options()
         file_dialog_options |= QtWidgets.QFileDialog.DontUseNativeDialog
-        file_dialog_title = "Select Amazon S3 Bucket Dirlist file"
+        file_dialog_title = "Select dirlist file"
         file_path, _ = QtWidgets.QFileDialog.getOpenFileName(None, file_dialog_title, "", "All Files (*)", options=file_dialog_options)
-        self.dirlist_path = file_path
-        # Update working dir
-        self.working_dir = os.path.dirname(os.path.abspath(file_path))
-        # Update UI
-        self.populate_tree_view_with_gui(file_path)
+        if file_path:
+            # Update working dir
+            self.dirlist_path = file_path
+            self.working_dir = os.path.dirname(os.path.abspath(file_path))
+            # Update UI
+            self.populate_tree_view_with_gui(file_path)
+
+    @pyqtSlot( )
+    def button_click_download_and_process_bucket_dirlist(self):
+        # Clear UI
+        self.init_ui()
+        # Check bucket details
+        if self.check_input_details():
+            self.populate_tree_view_with_gui(self.dirlist_path)
 
     @pyqtSlot( )
     def button_click_open_working_dir(self):
@@ -367,103 +466,176 @@ class Ui_MainWindow(QObject):
             open_dir(self.working_dir)
 
     @pyqtSlot( )
-    def button_click_download_and_process_bucket_dirlist(self):
-        # Check bucket details
-        if not self.check_input_details():
-            return
-        # Check that aws cli works
-        if not find_executable("aws") and not shutil.which("aws"):
-            self.show_message_box("aws cli was not found. Please make sure you have aws cli installed and configured in the PATH environment variable\nhttps://aws.amazon.com/cli/")
-            return
-        # Create temp dir
-        dirlist_name = self.current_bucket_name + ".dirlist.txt"
-        self.working_dir = tempfile.mkdtemp()
-        self.dirlist_path = os.path.join(self.working_dir, dirlist_name)
-        # Downlaod dirlist using aws CLI
-        command_line = "aws --no-sign-request s3 ls s3://{} --recursive > {}".format(self.current_bucket_name, self.dirlist_path)
-        res = os.system(command_line)
-        if res != 0:
-            self.show_message_box("Error in generating dirlist from {}. Is the name of the bucket correct? Did you run 'aws configure'?".format(self.current_bucket_name))
-            return
-        # Update UI
-        self.populate_tree_view_with_gui(self.dirlist_path)
-    
-    @pyqtSlot( )
     def button_click_search_do(self):
         # Hide all
         for item in self.treeWidget.findItems("", QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive):
             item.setHidden(True)
             # Mark as search mode only if there are items
-            self.search_mode = True
-
-        if self.search_mode:
+            self.mode.starting_search()
+        if self.mode.is_searching:
             # Show only those that match the search
             search_query = self.lineEditSearch.text()
-            flags = QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive
-            #flags |= QtCore.Qt.MatchRegExp # use regex
-            for item in self.treeWidget.findItems(search_query, flags):
-                # Walk up the chain
-                item_temp = item
-                while item_temp:
-                    item_temp.setHidden(False)
-                    item_temp = item_temp.parent()
-                    # If parent is not hidden, all the chain is visible so no need to redo
-                    if item_temp and not item_temp.isHidden():
-                        break
+            if search_query:
+                flags = QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive
+                #flags |= QtCore.Qt.MatchRegExp # use regex
+                for item in self.treeWidget.findItems(search_query, flags):
+                    # Walk up the chain
+                    item_temp = item
+                    while item_temp:
+                        item_temp.setHidden(False)
+                        item_temp = item_temp.parent()
+                        # If parent is not hidden, all the chain is visible so no need to redo
+                        if item_temp and not item_temp.isHidden():
+                            break
+            else:
+                self.button_click_search_clear()
+        self.update_ui()
     
     @pyqtSlot( )
     def button_click_search_clear(self):
         self.lineEditSearch.setText("")
-        if self.search_mode:
-            self.search_mode = False
+        if self.mode.is_searching:
+            self.mode.finished_search()
             # Show all
             for item in self.treeWidget.findItems("", QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive):
                 item.setHidden(False)
+        self.update_ui()
 
+    @pyqtSlot( )
+    def button_click_stop(self):
+        if self.mode.is_getting_dirlist and self.worker_dirlist:
+            self.worker_dirlist.stop()
+            self.mode.stopped_dirlist()
+
+    ################################################
+    ################## UI Updates ##################
+    ################################################
+    def update_ui(self):
+        # By default we want to present the current working dir
+        if self.dirlist_path:
+            self.lineEditDirlistPath.setText(self.dirlist_path)
+        else:
+            self.lineEditDirlistPath.setText("")
+
+        if self.mode.is_searching:
+            self.labelStatus.setText("Showing results for: '{}'".format(self.lineEditSearch.text()))
+            self.progressBar.setValue(0)
+        elif self.mode.is_getting_dirlist:
+            if self.node_processing:
+                self.labelStatus.setText("Currently processing: {}..".format(self.node_processing.full_path))
+            self.progressBar.setValue(0)
+            self.labelStatistics.setText("Showing {} items (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(self.nodes_stats.count_total, self.nodes_stats.count_dirs, self.nodes_stats.count_files, self.nodes_stats.get_human_readable_size(), self.nodes_stats.date_oldest or "?", self.nodes_stats.date_newest or "?"))
+            self.buttonStop.setEnabled(True)
+        elif self.mode.is_downloading_file:
+            self.labelStatus.setText("Downloading {}...".format(self.node_processing.full_path))
+        elif self.mode.is_dirlist_loaded:
+            self.labelStatus.setText("Working dir: {}".format(self.working_dir))
+            is_stopped_text = ""
+            if self.mode.is_stopped_dirlist:
+                is_stopped_text = "(STOPPED) "
+            self.labelStatistics.setText(is_stopped_text + "Showing {} items (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(self.nodes_stats.count_total, self.nodes_stats.count_dirs, self.nodes_stats.count_files, self.nodes_stats.get_human_readable_size(), self.nodes_stats.date_oldest or "?", self.nodes_stats.date_newest or "?"))
+            self.progressBar.setValue(0)
+            self.buttonSearchDo.setEnabled(True)
+            self.buttonSearchClear.setEnabled(True)
+            self.lineEditSearch.setEnabled(True)
+            self.buttonStop.setEnabled(False)
+        else:
+            # Init
+            self.labelStatus.setText("")
+            self.lineEditDirlistPath.setText("")
+            self.lineEditSearch.setText("")
+            self.progressBar.setValue(0)
+            self.buttonSearchDo.setEnabled(False)
+            self.buttonSearchClear.setEnabled(False)
+            self.lineEditSearch.setEnabled(False)
+            self.treeWidget.clear()
+            self.buttonStop.setEnabled(False)
+
+    def init_ui(self):
+        ### Init all variables
+        # Dirlist
+        self.working_dir = None
+        self.dirlist_path = None
+        self.list_new_nodes_to_process.clear()
+        # Selected items
+        self.selected_tree_item = None
+        self.selected_tree_node = None
+        self.node_processing = None
+        # URL
+        self.current_url = None
+        self.current_provider = None
+        # Nodes
+        self.nodes_stats = None
+        self.root_node = None
+        ### Update mode
+        self.mode.init()
+        ### Update UI
+        self.update_ui()
+
+    ################################################
+    ################## Dirlist #####################
+    ################################################
     # Populate tree view with all items
     def populate_tree_view(self, node, tree):
-        # Create tree item
-        tree_item = QTreeWidgetItem(tree, [node.basename, str(node.get_human_readable_size()), node.get_date_modified(), ""])
-        # Set icon
-        if node.is_directory:
-            tree_item.setIcon(0, QIcon(os.path.join(RUNNING_DIR, 'assets/folder.png')))
-        else:
-            tree_item.setIcon(0, QIcon(os.path.join(RUNNING_DIR, 'assets/file.png')))
+        tree_item = self.create_tree_view_item(node, tree)
         # Populate children
         for child_node in node.children.values():
             self.populate_tree_view(child_node, tree_item)
 
-    def populate_tree_view_with_gui(self, dirlist_path):
-        # Update UI
-        self.lineEditDirlist.setText(dirlist_path)
-        self.treeWidget.clear()
-        # Parse dirlist and populate tree view
-        if dirlist_path:
-            self.labelStatus.setText("Loading data from {}".format(dirlist_path))
-            try:
-                self.root_node, nodes_stats = parse_dirlist(dirlist_path)
-            except Exception as e:
-                self.show_message_box(str(e))
-                return
-            # Update UI
-            self.populate_tree_view(self.root_node, self.treeWidget)
-            self.labelStatistics.setText("Total items: {} (dirs: {}, files: {}) | Accumulated size: {} | Dates: {} - {}".format(nodes_stats.count_total,
-                nodes_stats.count_dirs,
-                nodes_stats.count_files,
-                nodes_stats.get_human_readable_size(),
-                nodes_stats.date_oldest,
-                nodes_stats.date_newest))
-        else:
-            self.root_node = None
-            self.treeWidget.clear()
-            self.labelStatistics.setText("")
-            self.current_bucket_name = None
-        # Clear
-        self.labelStatus.setText("Working dir: {}".format(self.working_dir))
-        self.progressBar.setValue(0)
-        self.selected_tree_item = None
-        self.selected_tree_node = None
+    def dirlist_report_progress(self, node, force_update=False):
+        if node:
+            self.list_new_nodes_to_process.append(node)
+        if force_update or len(self.list_new_nodes_to_process) % self.current_provider.NODE_BATCH_UPDATE_COUNT:
+            # Process batch
+            for node in self.list_new_nodes_to_process:
+                self.create_tree_view_item(node, node.parent.item_view)
+            # Save last processed node and clear list
+            if self.list_new_nodes_to_process:
+                self.node_processing = self.list_new_nodes_to_process[-1]
+                self.update_ui()
+                self.list_new_nodes_to_process.clear()
 
+    def dirlist_thread_finished(self):
+        # If finished successfully
+        if not self.worker_dirlist.has_errors:
+            # One last batch processing
+            self.dirlist_report_progress(None, force_update=True)
+            # Update status
+            self.mode.finished_dirlist()
+            self.update_ui()
+        else:
+            # Error were raised while getting dirlist, clear all UI
+            self.init_ui()
+
+    def dirlist_worker_report_error(self, exception_str):
+        show_message_box(exception_str)
+        self.thread_dirlist.terminate()
+        # Clear all
+        self.init_ui()
+
+    def populate_tree_view_with_gui(self, dirlist_path=None):
+        # Init
+        self.setup_root_node()
+        self.thread_dirlist = QThread()
+        self.worker_dirlist = DirlistWorker(nodes_stats=self.nodes_stats, root_node=self.root_node, provider=self.current_provider, pre_generated_dirlist_path=dirlist_path)
+        # Get working dirs
+        self.working_dir = self.worker_dirlist.working_dir
+        self.dirlist_path = self.worker_dirlist.dirlist_path
+        # Move worker to the thread
+        self.worker_dirlist.moveToThread(self.thread_dirlist)
+        # Connect signals and slots
+        self.thread_dirlist.started.connect(self.worker_dirlist.run)
+        self.thread_dirlist.finished.connect(self.thread_dirlist.deleteLater)
+        self.thread_dirlist.finished.connect(self.dirlist_thread_finished)
+        self.worker_dirlist.finished.connect(self.thread_dirlist.quit)
+        self.worker_dirlist.finished.connect(self.worker_dirlist.deleteLater)
+        self.worker_dirlist.progress.connect(self.dirlist_report_progress)
+        self.worker_dirlist.report_error.connect(self.dirlist_worker_report_error)
+        # Start the thread
+        self.thread_dirlist.start()
+        # Update status
+        self.mode.starting_dirlist()
+        self.update_ui()
 
 
 if __name__ == "__main__":

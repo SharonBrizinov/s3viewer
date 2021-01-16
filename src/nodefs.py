@@ -1,22 +1,24 @@
 import re
 from datetime import datetime
 
-DIRLIST_REGEX = re.compile("(\d+\-\d+\-\d+ \d+\:\d+\:\d+)\s+(\d+)\s+(.*)")
+from utils import decode_data
+from consts import DIRLIST_REGEX
 
-def decode_data(data):
-    # Try brute forcing all popular encodings
-    for encoding in ["utf-8", "utf-16-le", "utf-16-be", "latin-1", "ascii"]:
-        try:
-            return data.decode(encoding)
-        except Exception as e:
-            pass
-    return None
+
+def parse_dirlist_line(line):
+    parsed_line = DIRLIST_REGEX.findall(line)
+    if parsed_line:
+        date_modified, size, full_path = parsed_line[0]
+        new_node = FSNode(full_path, date_modified, size)
+        return new_node
+    else:
+        raise Exception("Bad dirlist data. Could not parse line: '{}'".format(line))
 
 def parse_dirlist(dirlist_path):
     # Dirlist:
     #   2016-11-14 16:14:09          0 DirName/
     #   2016-11-14 16:14:10         10 DirName/File.txt
-    stats = NSNodeStats()
+    stats = FSNodeStats()
     root_node = FSNode("", None, 0)
     # Read dirlist
     with open(dirlist_path, "rb") as f:
@@ -24,18 +26,12 @@ def parse_dirlist(dirlist_path):
     dirlist_data = decode_data(dirlist_data_raw)
     if not dirlist_data:
         raise Exception("Could not decode dirlist. Are you sure your data is valid?")
-
     # Parse
     lines = dirlist_data.splitlines()
     for i, line in enumerate(lines):
-        parsed_line = DIRLIST_REGEX.findall(line)
-        if parsed_line:
-            date_modified, size, full_path = parsed_line[0]
-            new_node = FSNode(full_path, date_modified, size)
-            root_node.process_sub_node(new_node)
-            stats.process_node(new_node)
-        else:
-            raise Exception("Bad dirlist data. Could not parse line: '{}'".format(line))
+        new_node = parse_dirlist_line(line)
+        root_node.process_sub_node(new_node)
+        stats.process_node(new_node)
     return root_node, stats
 
 def print_all_nodes(node, level=0):
@@ -44,7 +40,7 @@ def print_all_nodes(node, level=0):
         print_all_nodes(child_node, level+1)
 
 
-class NSNodeStats(object):
+class FSNodeStats(object):
     def __init__(self):
         self.count_total = 0
         self.count_files = 0
@@ -66,11 +62,13 @@ class NSNodeStats(object):
         else:
             self.count_dirs += 1
 
-        if node.date_modified > self.date_newest:
-            self.date_newest = node.date_modified
+        if node.date_modified:
+            if node.date_modified > self.date_newest:
+                self.date_newest = node.date_modified
 
-        if node.date_modified < self.date_oldest:
-            self.date_oldest = node.date_modified
+        if node.date_modified:
+            if node.date_modified < self.date_oldest:
+                self.date_oldest = node.date_modified
 
         self.count_total += 1
 
@@ -91,16 +89,18 @@ class FSNode(object):
         self.path_list = self.get_path_list()
         self.basename = self.path_list[-1]
         self.children = {} # {'name': FSNode}
+        self.parent = None
         self.is_directory = self.get_is_directory()
         self.is_file = not self.is_directory
         self.is_downloaded = False
         self.download_path = None
+        self.item_view = None # GUI Representation
 
     def __repr__(self):
         if self.is_file:
-            return "Name: {}, Size: {}, Created: {}  ".format(self.basename, self.get_human_readable_size(), self.date_modified)
+            return "Name: {}, Size: {}, Created: {}  ".format(self.basename, self.get_human_readable_size(), self.date_modified or "?")
         else:
-            return "Name: {}, Created: {}, Children: {}  ".format(self.basename, self.date_modified, len(self.children))
+            return "Name: {}, Created: {}, No. Children: {}  ".format(self.basename, self.date_modified  or "?", len(self.children))
 
     def get_path_list(self):
         # Edge case for root node ("/")
@@ -139,6 +139,7 @@ class FSNode(object):
         return self.size == 0 and self.full_path.endswith("/")
 
     def process_sub_node(self, new_node):
+        new_nodes = []
         current_node = self
         path_list = new_node.path_list
         for i, path_element in enumerate(path_list):
@@ -152,9 +153,12 @@ class FSNode(object):
                     sub_node = FSNode(sub_node_full_path, None, 0)
                     current_node.add_child(sub_node)
                     current_node = sub_node
+                    # Keep track of new nodes
+                    new_nodes.append(sub_node)
                 else:
                     # Must be the last part
-                    current_node.children[path_element] = new_node
+                    current_node.add_child(new_node, special_name=path_element)
+        return new_nodes
 
     def get_how_many_childern_are_files(self):
         count_files = 0
@@ -163,8 +167,12 @@ class FSNode(object):
                 count_files += 1
         return count_files
 
-    def add_child(self, new_child):
-        self.children[new_child.basename] = new_child
+    def add_child(self, new_child, special_name=None):
+        if special_name:
+           self.children[special_name] = new_child
+        else:
+            self.children[new_child.basename] = new_child
+        new_child.parent = self
 
     # should be called from root node
     def get_sub_node(self, full_path):
