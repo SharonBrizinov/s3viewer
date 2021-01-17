@@ -103,7 +103,7 @@ class Ui_MainWindow(QObject):
         # Line edit url
         self.lineEditUrl = QtWidgets.QLineEdit(self.centralwidget)
         self.lineEditUrl.setObjectName("lineEditUrl")
-        self.lineEditUrl.setPlaceholderText("FTP, HTTP, S3 Bucket")
+        self.lineEditUrl.setPlaceholderText("FTP, HTTP, S3 Bucket, Azure Blob")
         self.horizontalLayout.addWidget(self.lineEditUrl)
         # Bucket get dirlist
         self.buttonGetDirlist = QtWidgets.QPushButton(self.centralwidget)
