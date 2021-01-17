@@ -38,6 +38,19 @@ python s3viewer.py
 **Usage**
 Fill the name of the bucket and press `Get Dirlist`. Use double-click to download a file or use right-click for more options such as download all files in a directory. You can keep the generated dirlist to load quickly later.
 
+
+### TODO
+- Features
+ - Download manager
+  - Background downloads
+  - Parallel downloads
+  - Stop/Pause/Resume a download
+ - Explorer mode
+ - Add Microsoft Azure support
+ - Mac, Linux builds
+- Bugs
+ - Progress bar isn't synced with FTP downloads
+
 ## Motivation
 ### TL;DR
 Publicly open s3 buckets have become a serious threat to many companies and people due to [massive data leaks](https://github.com/nagwww/s3-leaks) which led to countless breaches, extortions, and overall embarrassment to all invloved parties. I have personally discovered and reported on dozens of major s3 buckets open to the public belonging to companies that were completely unaware of them. This must be stopped and I hope this tool will help security researchers to identify misconfigured s3 buckets in order to responsibly disclose it to the affected companies.
