@@ -41,15 +41,15 @@ Fill the name of the bucket and press `Get Dirlist`. Use double-click to downloa
 
 ### TODO
 - Features
- - Download manager
-  - Background downloads
-  - Parallel downloads
-  - Stop/Pause/Resume a download
- - Explorer mode
- - Add Microsoft Azure support
- - Mac, Linux builds
+  - Download manager
+    - Background downloads
+    - Parallel downloads
+    - Stop/Pause/Resume a download
+  - Explorer mode
+  - Add Microsoft Azure support
+  - Mac, Linux builds
 - Bugs
- - Progress bar isn't synced with FTP downloads
+  - Progress bar isn't synced with FTP downloads
 
 ## Motivation
 ### TL;DR
