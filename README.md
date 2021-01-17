@@ -1,7 +1,8 @@
 # S3Viewer [![Build Status](https://travis-ci.com/SharonBrizinov/s3viewer.svg?branch=main)](https://travis-ci.com/SharonBrizinov/s3viewer)
 ## Publicly open storage viewer (Amazon S3 Bucket, Azure Blob, FTP server, HTTP Index Of/)
 
-![Icon](packaging/icons/icon_3s.jpg)
+<img src="packaging/icons/icon_3s.jpg" width="200">
+
 
 `s3viewer` is a free tool for security researchers that lists the content of publicly open storages and helps to identify leaking data. The tool allows you to view all the files in a given storage and download selected files and directories. The goal is to identify the owner of the storage as quickly as possible in order to report that data is leaking from it.
 
@@ -11,9 +12,15 @@ Supported open storage:
 - FTP servers with Anonymous access allowed
 - HTTP Index Of / Pages (Apache/nginx-style directory listing)
 
+
+![Simplified](example/simplified.png)
+
+
 The tool lists directory contents and display them in a tree view GUI from which you can navigate to view all directories and files and even download them. You can also use the `Load` button to load a pre-downloaded dirlist to view the directory hierarchy offline.
 
+
 ![Demo](example/demo.gif)
+
  
 ## Feature List
 - Supporting multiple open storage types including S3 bucket, Azure blob, FTP, HTTP Index
