@@ -295,7 +295,7 @@ def yield_fetch_dir(url, max_recurse_level=HTTP_MAX_RECURSE_LEVEL, recurse_level
         return
     # Fix cwd to support inner starting point
     #   cwd shouldn't start with /, but it should end with one
-    if cwd:
+    if cwd and cwd is not "/":
         cwd = cwd.strip("/") + "/"
     else:
         cwd = ""
