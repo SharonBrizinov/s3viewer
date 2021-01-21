@@ -356,6 +356,7 @@ class Ui_MainWindow(QObject):
             return False
         self.current_provider = current_provider_class(self.current_url)
         if not self.current_provider.check():
+            show_message_box("Could not use {} provider for '{}'".format(current_provider_class.__name__, self.current_url))
             return False
         return True
 
