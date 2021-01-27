@@ -30,6 +30,10 @@ class AzureStorageProvider(StorageProvider):
         if not find_executable("azcopy") and not shutil.which("azcopy"):
             show_message_box("azcopy not found. Please make sure you have placed azcopy somewhere in the PATH. https://docs.microsoft.com/en-us/azure/storage/common/storage-use-azcopy-v10")
             return False
+        container = urlparse(self.url.lower()).path
+        if not container or container == "/":
+            show_message_box("Please provide container name as well. https://BLOBNAME.blob.core.windows.net/CONTAINER")
+            return False
         return True
 
     def get_download_url(self, relative_path):
@@ -41,7 +45,7 @@ class AzureStorageProvider(StorageProvider):
         if line_parsed:
             file_path, size = line_parsed[0]
             # TODO: Currently there is no date in azcopy output, so we are faking one
-            return "1970-01-01 00:00:00 {:>13} {}".format(size, file_path) + os.linsep
+            return "1970-01-01 00:00:00 {:>13} {}".format(size, file_path) + os.linesep
         return None
 
     def yield_dirlist(self):

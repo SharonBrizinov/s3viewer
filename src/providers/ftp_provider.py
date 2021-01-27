@@ -173,7 +173,9 @@ class FTPStorageProvider(StorageProvider):
     def check(self):
         try:
             self.ftp = FTP(self.hostname(), FTP_USER_DEFAULT, FTP_PASS_DEFAULT)
-            return self.ftp.pwd() == "/"
+            if self.ftp.pwd():
+                return True
+            return False
         except Exception as e:
             show_message_box(self.get_default_error_message())
         return False
@@ -185,8 +187,6 @@ class FTPStorageProvider(StorageProvider):
     def yield_dirlist(self):
         if not self.ftp:
             self.ftp = FTP(self.hostname(), FTP_USER_DEFAULT, FTP_PASS_DEFAULT)
-            if not self.ftp.pwd() == "/":
-                raise Exception(self.get_default_error_message())
 
         for dirlist_line in yield_fetch_dir(self.ftp, self.url_path()):
             # Stop
