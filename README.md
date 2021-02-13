@@ -51,11 +51,11 @@ Fill the storage url and press `Get Dirlist`. Use double-click to download a fil
 
 **Supported URL schemes**
 - AWS
-	- http://BUCKETNAME.s3.REGION.amazonaws.com/
-	- https://BUCKETNAME.s3.amazonaws.com
-	- s3://BUCKETNAME
+	- http://<BUCKETNAME>.s3.<REGION>.amazonaws.com/
+	- https://<BUCKETNAME>.s3.amazonaws.com
+	- s3://<BUCKETNAME>
 - Azure
-	- https://BLOBNAME.blob.core.windows.net/CONTAINER
+	- https://<ACCOUNTNAME>.blob.core.windows.net/<CONTAINER>
 - FTP
 	- ftp://ftp.server.com
 - HTTP Index
