@@ -249,7 +249,7 @@ def parse(soup):
     return cwd, listing
 
 def fetch_listing(url, timeout=30):
-    req = requests.get(url, headers=HEADERS, timeout=timeout)
+    req = requests.get(url, headers=HEADERS, timeout=timeout, verify=False)
     req.raise_for_status()
     soup = bs4.BeautifulSoup(req.content, 'html5lib')
     return parse(soup)
@@ -304,7 +304,10 @@ def yield_fetch_dir(url, max_recurse_level=HTTP_MAX_RECURSE_LEVEL, recurse_level
         if is_directory(f):
             if not filename_output.endswith("/"):
                 filename_output = filename_output + "/"
-        date_format = time.strftime('%Y-%m-%d %H:%M:%S', f.modified)
+        if f.modified:
+            date_format = time.strftime('%Y-%m-%d %H:%M:%S', f.modified)
+        else:
+            date_format = "1970-01-01 00:00:00" # Fake date
         size_format = f.size or "0"
         yield "{}{:>13} {}".format(date_format, size_format, filename_output) + os.linesep
         queue_process.append(f)
