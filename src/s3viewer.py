@@ -317,7 +317,8 @@ class Ui_MainWindow(QObject):
         return out
 
     # Node to tree item
-    def create_tree_view_item(self, node, tree_parent):
+    @staticmethod
+    def create_tree_view_item(node, tree_parent):
         # Create tree item
         tree_item = QTreeWidgetItem(tree_parent, [node.basename, str(node.get_human_readable_size()), node.get_date_modified(), ""])
         # Set icon

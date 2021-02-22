@@ -38,8 +38,9 @@ class AzureStorageProvider(StorageProvider):
 
     def get_download_url(self, relative_path):
         return self.url.rstrip("/") + "/" + relative_path
-
-    def _parse_line(self, line):
+    
+    @staticmethod
+    def _parse_line(line):
         # INFO: filename; Content Length: 1234
         line_parsed = AZURE_LINE_REGEX.findall(line)
         if line_parsed:

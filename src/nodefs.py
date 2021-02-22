@@ -128,7 +128,8 @@ class FSNode:
             num /= 1024.0
         return "%.1f%s%s" % (num, 'Yi', suffix)
 
-    def get_format_date(self, date):
+    @staticmethod
+    def get_format_date(date):
         # 2017-12-11 11:56:04
         if date:
             return datetime.strptime(date, "%Y-%m-%d %H:%M:%S")

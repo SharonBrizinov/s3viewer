@@ -9,11 +9,13 @@ class StorageProvider():
     @staticmethod
     def is_provider(url):
         return False
-
-    def check(self):
+    
+    @staticmethod
+    def check():
         return True
-
-    def get_download_url(self, relative_path):
+    
+    @staticmethod
+    def get_download_url(relative_path):
         return relative_path
 
     def hostname(self):
