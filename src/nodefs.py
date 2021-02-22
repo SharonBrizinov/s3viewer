@@ -40,7 +40,7 @@ def print_all_nodes(node, level=0):
         print_all_nodes(child_node, level+1)
 
 
-class FSNodeStats(object):
+class FSNodeStats:
     def __init__(self):
         self.count_total = 0
         self.count_files = 0
@@ -81,7 +81,7 @@ class FSNodeStats(object):
         return "%.1f%s%s" % (num, 'Yi', suffix)
 
 
-class FSNode(object):
+class FSNode:
     def __init__(self, full_path, date_modified, size):
         self.full_path = "/" + full_path
         self.date_modified = self.get_format_date(date_modified)
