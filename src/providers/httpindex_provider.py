@@ -30,6 +30,7 @@ DATETIME_FMTs = (
 (re.compile(r'[F-W][a-u]{2}, \d+ [A-S][a-y]{2} \d{4} \d{2}:\d{2}:\d{2} .+'), "%a, %d %b %Y %H:%M:%S %Z"),
 (re.compile(r'\d{4}-\d+-\d+'), "%Y-%m-%d"),
 (re.compile(r'\d+/\d+/\d{4} \d{2}:\d{2}:\d{2} [+-]\d{4}'), "%d/%m/%Y %H:%M:%S %z"),
+(re.compile(r'\d+\/\d+\/\d{4}\W+\d+:\d{2}\W+\w{2}'), "%m/%d/%Y %I:%M %p"),
 (re.compile(r'\d{2} [A-S][a-y]{2} \d{4}'), "%d %b %Y")
 )
 
@@ -84,6 +85,8 @@ def parse(soup):
         title = soup.h1.get_text().strip()
         if title.startswith('Index of '):
             cwd = title[9:]
+        elif " - " in title:
+            cwd = title.split(" - ")[-1]
     [img.decompose() for img in soup.find_all('img')]
     file_name = file_mod = file_size = file_desc = None
     pres = [x for x in soup.find_all('pre') if
@@ -91,6 +94,7 @@ def parse(soup):
     tables = [x for x in soup.find_all('table') if
               x.find(string=RE_COMMONHEAD)] if not pres else ()
     heads = []
+    processed_filenames = []
     if pres:
         pre = pres[0]
         started = False
@@ -99,12 +103,15 @@ def parse(soup):
                 if not element.string or not element.string.strip():
                     continue
                 elif started:
-                    if file_name:
+                    if file_mod or file_size or file_desc:
+                        file_name = aherf2filename(element['href'])
+                    if file_name and file_name not in processed_filenames:
+                        processed_filenames.append(file_name)
                         listing.append(FileEntry(
                             file_name, file_mod, file_size, file_desc))
                     file_name = aherf2filename(element['href'])
                     file_mod = file_size = file_desc = None
-                elif (element.string in ('Parent Directory', '..', '../') or
+                elif (element.string and element.string.lower() in ('[to parent directory]' ,'parent directory', '..', '../') or
                       element['href'][0] not in '?/'):
                     started = True
             elif not element.name:
@@ -130,7 +137,7 @@ def parse(soup):
                         file_desc = None
             else:
                 continue
-        if file_name:
+        if file_name and file_name not in processed_filenames:
             listing.append(FileEntry(file_name, file_mod, file_size, file_desc))
     elif tables:
         started = False
@@ -198,7 +205,8 @@ def parse(soup):
                     elif status:
                         # unknown header
                         status += 1
-                if file_name:
+                if file_name and file_name not in processed_filenames:
+                    processed_filenames.append(file_name)
                     listing.append(FileEntry(
                         file_name, file_mod, file_size, file_desc))
             elif tr.hr:
@@ -245,17 +253,27 @@ def parse(soup):
                 or RE_ABSPATH.match(file_name)):
                 continue
             else:
-                listing.append(FileEntry(file_name, None, None, None))
+                if file_name and file_name not in processed_filenames:
+                    processed_filenames.append(file_name)
+                    listing.append(FileEntry(file_name, None, None, None))
     return cwd, listing
 
-def fetch_listing(url, timeout=30):
-    req = requests.get(url, headers=HEADERS, timeout=timeout, verify=False)
+def fetch_listing(url, timeout=10):
+    try:
+        req = requests.get(url, headers=HEADERS, timeout=timeout, verify=False)
+    except requests.exceptions.Timeout as e:
+        raise e
+    except requests.exceptions.TooManyRedirects as e:
+        raise e
+    except requests.exceptions.RequestException as e:
+        raise e
+
     req.raise_for_status()
     soup = bs4.BeautifulSoup(req.content, 'html5lib')
     return parse(soup)
 
 def is_directory(entry):
-    return entry.description == "Directory" or (not entry.description and not entry.size)
+    return (entry.description and entry.description.lower() in ("directory", "dir", "<dir>", "[dir]")) or (not entry.description and not entry.size)
 
 def print_fetch_dir(url, max_recurse_level=HTTP_MAX_RECURSE_LEVEL, recurse_level=0):
     if recurse_level == 0:
