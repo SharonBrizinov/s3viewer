@@ -16,3 +16,6 @@ FTP_PASS_DEFAULT = "anonymous"
 
 # Download
 DOWNLOAD_MIN_CHUNK_SIZE = 10*1024 # 10KB
+
+# Max items
+DEFAULT_MAX_ITEMS = 50_000

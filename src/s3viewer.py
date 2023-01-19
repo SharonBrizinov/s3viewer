@@ -66,6 +66,7 @@ class Ui_MainWindow(QObject):
         self.worker_dirlist = None
         self.working_dir = None
         self.dirlist_path = None
+        self.max_items = DEFAULT_MAX_ITEMS
         self.list_new_nodes_to_process = [] # Batch processing
         # Selected items
         self.selected_tree_item = None
@@ -110,6 +111,11 @@ class Ui_MainWindow(QObject):
         self.buttonGetDirlist.setObjectName("buttonGetDirlist")
         self.buttonGetDirlist.setText("Get Dirlist")
         self.horizontalLayout.addWidget(self.buttonGetDirlist)
+        # Max items
+        self.maxItems = QtWidgets.QLineEdit(self.centralwidget)
+        self.maxItems.setObjectName("maxItems")
+        self.maxItems.setPlaceholderText("Max items (default: {})".format(str(DEFAULT_MAX_ITEMS)))
+        self.horizontalLayout.addWidget(self.maxItems)
         #####################################
 
         ### Horizontal Layout 2 - Dirlist path###
@@ -358,6 +364,11 @@ class Ui_MainWindow(QObject):
         if not self.current_provider.check():
             show_message_box("Could not use {} provider for '{}'".format(current_provider_class.__name__, self.current_url))
             return False
+        max_items_str = self.maxItems.text().strip()
+        try:
+            self.max_items = int(max_items_str)
+        except ValueError:
+            show_message_box("Could not convert field max items as '{}' to number".format(max_items_str))
         return True
 
     ################################################
@@ -616,7 +627,7 @@ class Ui_MainWindow(QObject):
         # Init
         self.setup_root_node()
         self.thread_dirlist = QThread()
-        self.worker_dirlist = DirlistWorker(nodes_stats=self.nodes_stats, root_node=self.root_node, provider=self.current_provider, pre_generated_dirlist_path=dirlist_path)
+        self.worker_dirlist = DirlistWorker(nodes_stats=self.nodes_stats, root_node=self.root_node, provider=self.current_provider, max_items=self.max_items, pre_generated_dirlist_path=dirlist_path)
         # Get working dirs
         self.working_dir = self.worker_dirlist.working_dir
         self.dirlist_path = self.worker_dirlist.dirlist_path

@@ -7,7 +7,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 
 from utils import show_message_box, extract_domain, decode_data
 from nodefs import FSNode, parse_dirlist_line
-
+from consts import DEFAULT_MAX_ITEMS
 
 class DirlistWorker(QObject):
     # Signals
@@ -15,7 +15,7 @@ class DirlistWorker(QObject):
     progress = pyqtSignal(FSNode)
     report_error = pyqtSignal(str)
 
-    def __init__(self, nodes_stats, root_node, provider, pre_generated_dirlist_path=None):
+    def __init__(self, nodes_stats, root_node, provider, max_items=DEFAULT_MAX_ITEMS, pre_generated_dirlist_path=None):
         super().__init__()
         # Stop and responsiveness
         self.should_stop = False
@@ -26,6 +26,8 @@ class DirlistWorker(QObject):
         self.root_node = root_node
         self.provider = provider
         self.pre_generated_dirlist_path = pre_generated_dirlist_path
+        self.max_items = max_items
+        self.current_items = 0
         # Working modes
         self.is_offline = False # Should get dirlist
         self.has_errors = False
@@ -74,7 +76,7 @@ class DirlistWorker(QObject):
 
     # Get dirlist
     def run(self):
-        counter_iter = 1 # to avoid sleeping the first time
+        self.current_items = 1 # to avoid sleeping the first time
         dirlist_file = None
 
         # Get iterator
@@ -97,8 +99,12 @@ class DirlistWorker(QObject):
                     break
 
                 # GUI responsiveness
-                if counter_iter % self.counter_items_before_sleep == 0:
+                if self.current_items % self.counter_items_before_sleep == 0:
                     time.sleep(self.seconds_sleep)
+
+                if self.current_items - 1 >= self.max_items:
+                    self.provider.stop()
+                    break
 
                 # Write to dirlist file if online
                 if not self.is_offline:
@@ -120,7 +126,7 @@ class DirlistWorker(QObject):
                     self.nodes_stats.process_node(new_node)
                     self.progress.emit(new_node)
 
-                counter_iter += 1 # must be in the outter loop
+                self.current_items += 1 # must be in the outter loop
         except Exception as e:
             self.has_errors = True
             self.report_error.emit(str(e))
