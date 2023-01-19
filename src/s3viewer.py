@@ -366,7 +366,10 @@ class Ui_MainWindow(QObject):
             return False
         max_items_str = self.maxItems.text().strip()
         try:
-            self.max_items = int(max_items_str)
+            if max_items_str:
+                self.max_items = int(max_items_str)
+            else:
+                self.max_items = DEFAULT_MAX_ITEMS
         except ValueError:
             show_message_box("Could not convert field max items as '{}' to number".format(max_items_str))
         return True
