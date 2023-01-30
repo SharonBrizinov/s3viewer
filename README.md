@@ -1,5 +1,5 @@
 # S3Viewer [![Build Status](https://travis-ci.com/SharonBrizinov/s3viewer.svg?branch=main)](https://travis-ci.com/SharonBrizinov/s3viewer)
-## Publicly open storage viewer (Amazon S3 Bucket, Azure Blob, FTP server, HTTP Index Of/)
+## Storage explorer & Publicly open storage viewer (Amazon S3 Bucket, Azure Blob, FTP server, HTTP Index Of/)
 
 <p align="center">
 	<img src="packaging/icons/icon_3s.jpg" width="200">
