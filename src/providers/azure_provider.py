@@ -54,6 +54,12 @@ class AzureStorageProvider(StorageProvider):
         # we want to work with strings (UTF-8) instead of bytes
         proc.stdout = codecs.getreader('utf-8')(proc.stdout)
         for stdout_line in iter(proc.stdout.readline, ""):
+            # Empty line
+            if not stdout_line.strip():
+                continue
+            # 'INFO: azcopy: A newer version 10.18.0 is available to download\n'
+            if "azcopy: A newer version" in stdout_line:
+                continue
             # Stop
             if self.should_stop:
                 break
