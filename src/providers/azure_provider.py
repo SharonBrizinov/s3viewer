@@ -58,7 +58,7 @@ class AzureStorageProvider(StorageProvider):
             if not stdout_line.strip():
                 continue
             # 'INFO: azcopy: A newer version 10.18.0 is available to download\n'
-            if "azcopy: A newer version" in stdout_line:
+            if "A newer version" in stdout_line or "Autologin not specified" in stdout_line:
                 continue
             # Stop
             if self.should_stop:
