@@ -1,4 +1,3 @@
-
 class StorageProvider():
     NODE_BATCH_UPDATE_COUNT = 1
 
@@ -27,4 +26,3 @@ class StorageProvider():
 
     def stop(self):
         self.should_stop = True
-

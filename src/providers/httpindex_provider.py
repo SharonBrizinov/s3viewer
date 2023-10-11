@@ -1,16 +1,15 @@
-import sys
+import argparse
+import collections
 import os
 import re
 import time
-import argparse
-import requests
-import collections
 import urllib.parse
-import bs4
 
-from utils import show_message_box
+import bs4
+import requests
 from consts import HTTP_MAX_RECURSE_LEVEL, USER_AGENT
 from providers.base_provider import StorageProvider
+from utils import show_message_box
 
 ##################################################################################
 ### Most of the code here is from https://github.com/gumblex/htmllisting-parser ##

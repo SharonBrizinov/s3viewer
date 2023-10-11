@@ -11,6 +11,7 @@ from providers.base_provider import StorageProvider
 
 AZURE_LINE_REGEX = re.compile(r"INFO\: (.*);\s+Content Length: (\d+)")
 
+
 class AzureStorageProvider(StorageProvider):
     NODE_BATCH_UPDATE_COUNT = 1000
 

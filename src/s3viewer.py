@@ -1,16 +1,13 @@
-import os
-import sys
+from PyQt6 import QtCore
+from PyQt6.QtCore import QThread, pyqtSlot
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QTreeWidgetItem, QApplication, QFrame
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
-from PyQt5.QtWidgets import QTreeWidgetItem, QApplication, QSpacerItem, QSizePolicy, QFrame
-from PyQt5.QtGui import QIcon
-
-from utils import *
-from nodefs import *
-from dirlist import *
 from consts import *
+from dirlist import *
+from nodefs import *
 from providers.providers import *
+from utils import *
 
 
 class Mode():
@@ -145,7 +142,7 @@ class Ui_MainWindow(QObject):
 
         # Separator
         self.separatorLine = QFrame()
-        self.separatorLine.setFrameShape(QFrame.HLine)
+        self.separatorLine.setFrameShape(QFrame.Shape.HLine)
         self.verticalLayout.addWidget(self.separatorLine)
         #####################################
 
@@ -188,11 +185,11 @@ class Ui_MainWindow(QObject):
         self.treeWidget.headerItem().setText(1, "Size")
         self.treeWidget.headerItem().setText(2, "Date Modified")
         self.treeWidget.headerItem().setText(3, "Downloaded")
-        self.treeWidget.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
-        self.treeWidget.header().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
-        self.treeWidget.header().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)
-        self.treeWidget.header().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)
-        self.treeWidget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.treeWidget.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self.treeWidget.header().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self.treeWidget.header().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self.treeWidget.header().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self.treeWidget.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.horizontalLayout_4.addWidget(self.treeWidget)
         #####################################
 
@@ -278,7 +275,7 @@ class Ui_MainWindow(QObject):
         action_open_dir = menu.addAction("Open Directory")
         action_open_dir.triggered.connect(self.tree_item_open_directory)
         action_open_dir.setEnabled(is_dir or is_downloaded)
-        menu.exec_(self.treeWidget.mapToGlobal(point))
+        menu.exec(self.treeWidget.mapToGlobal(point))
 
     def tree_item_download(self):
         if self.selected_tree_node.is_file:
@@ -403,7 +400,7 @@ class Ui_MainWindow(QObject):
         if not path_save_to:
             return False
         # Prepare download url
-        path_download = node.full_path.lstrip("/") # remove the first / if any
+        path_download = node.full_path.lstrip("/")  # remove the first / if any
         url_download = self.current_provider.get_download_url(path_download)
         try:
             # Download
@@ -451,8 +448,9 @@ class Ui_MainWindow(QObject):
         # Clear UI
         self.init_ui()
         # Get dirlist
-        file_dialog_options = QtWidgets.QFileDialog.Options()
-        file_dialog_options |= QtWidgets.QFileDialog.DontUseNativeDialog
+        file_dialog = QtWidgets.QFileDialog()
+        file_dialog_options = file_dialog.options()
+        file_dialog_options |= QtWidgets.QFileDialog.Option.DontUseNativeDialog
         file_dialog_title = "Select dirlist file"
         file_path, _ = QtWidgets.QFileDialog.getOpenFileName(None, file_dialog_title, "", "All Files (*)", options=file_dialog_options)
         if file_path:
@@ -478,7 +476,7 @@ class Ui_MainWindow(QObject):
     @pyqtSlot( )
     def button_click_search_do(self):
         # Hide all
-        for item in self.treeWidget.findItems("", QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive):
+        for item in self.treeWidget.findItems("", QtCore.Qt.MatchFlag.MatchContains | QtCore.Qt.MatchFlag.MatchRecursive):
             item.setHidden(True)
             # Mark as search mode only if there are items
             self.mode.starting_search()
@@ -486,8 +484,8 @@ class Ui_MainWindow(QObject):
             # Show only those that match the search
             search_query = self.lineEditSearch.text()
             if search_query:
-                flags = QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive
-                #flags |= QtCore.Qt.MatchRegExp # use regex
+                flags = QtCore.Qt.MatchFlag.MatchContains | QtCore.Qt.MatchFlag.MatchRecursive
+                # flags |= QtCore.Qt.MatchRegExp # use regex
                 for item in self.treeWidget.findItems(search_query, flags):
                     # Walk up the chain
                     item_temp = item
@@ -507,7 +505,7 @@ class Ui_MainWindow(QObject):
         if self.mode.is_searching:
             self.mode.finished_search()
             # Show all
-            for item in self.treeWidget.findItems("", QtCore.Qt.MatchContains | QtCore.Qt.MatchRecursive):
+            for item in self.treeWidget.findItems("", QtCore.Qt.MatchFlag.MatchContains | QtCore.Qt.MatchFlag.MatchRecursive):
                 item.setHidden(False)
         self.update_ui()
 
@@ -657,4 +655,4 @@ if __name__ == "__main__":
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
     MainWindow.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

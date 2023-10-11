@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 from utils import show_message_box
 from providers.base_provider import StorageProvider
 
+
 class S3StorageProvider(StorageProvider):
     NODE_BATCH_UPDATE_COUNT = 1000
 

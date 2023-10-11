@@ -1,14 +1,7 @@
-import shutil
-import subprocess
-import codecs
-from distutils.spawn import find_executable
-from urllib.parse import urlparse
-
-from utils import show_message_box
-from providers.aws_provider import S3StorageProvider
-from providers.httpindex_provider import HTTPIndexStorageProvider
-from providers.ftp_provider import FTPStorageProvider
-from providers.azure_provider import AzureStorageProvider
+from .aws_provider import S3StorageProvider
+from .azure_provider import AzureStorageProvider
+from .ftp_provider import FTPStorageProvider
+from .httpindex_provider import HTTPIndexStorageProvider
 
 
 def find_provider_class_by_url(url):
