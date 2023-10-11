@@ -1,3 +1,4 @@
+PyQt6
 PyInstaller
 beautifulsoup4
 html5lib
