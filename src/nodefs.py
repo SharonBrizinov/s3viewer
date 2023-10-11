@@ -1,8 +1,7 @@
-import re
 from datetime import datetime
 
-from utils import decode_data
 from consts import DIRLIST_REGEX
+from utils import decode_data
 
 
 def parse_dirlist_line(line):
@@ -13,6 +12,7 @@ def parse_dirlist_line(line):
         return new_node
     else:
         raise Exception("Bad dirlist data. Could not parse line: '{}'".format(line))
+
 
 def parse_dirlist(dirlist_path):
     # Dirlist:
@@ -33,6 +33,7 @@ def parse_dirlist(dirlist_path):
         root_node.process_sub_node(new_node)
         stats.process_node(new_node)
     return root_node, stats
+
 
 def print_all_nodes(node, level=0):
     print("{}{}".format(level*"\t", node.basename))

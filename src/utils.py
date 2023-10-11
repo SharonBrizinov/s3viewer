@@ -1,6 +1,6 @@
-import sys
 import os
 import subprocess
+import sys
 import urllib
 from urllib.parse import urlparse
 
@@ -9,15 +9,16 @@ from PyQt6 import QtWidgets
 
 from consts import USER_AGENT, DOWNLOAD_MIN_CHUNK_SIZE
 
-
 # Get reference to running directory
 RUNNING_DIR = os.path.dirname(os.path.abspath(__file__))
 # PyInstaller - in case of PyInstaller the running directory is sys._MEIPASS
 if hasattr(sys, '_MEIPASS'):
     RUNNING_DIR = sys._MEIPASS
 
+
 def get_asset_path(relative_path):
     return os.path.join(RUNNING_DIR, relative_path)
+
 
 def download_file(url, filename, report_hook):
     scheme = urlparse(url).scheme
@@ -46,13 +47,14 @@ def download_file(url, filename, report_hook):
         raise Exception("Download error: unknown scheme")
 
 
-def show_message_box(msg, alert_type=QtWidgets.QMessageBox.warning):
+def show_message_box(msg, alert_type=QtWidgets.QMessageBox.Icon.Warning):
     msg_box = QtWidgets.QMessageBox()
     msg_box.setText(msg)
     msg_box.setIcon(alert_type)
-    msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
-    msg_box.setDefaultButton(QtWidgets.QMessageBox.Ok)
-    ret = msg_box.exec_()
+    msg_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+    msg_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+    ret = msg_box.exec()
+
 
 def open_dir(path):
     try:
@@ -76,9 +78,11 @@ def open_file(path):
     except subprocess.CalledProcessError as e:
         pass
 
+
 def extract_domain(url):
     domain = urlparse('url').netloc
     return domain or url
+
 
 def decode_data(data):
     # Try brute forcing all popular encodings

@@ -1,21 +1,21 @@
+import datetime
 import os
 import re
 import urllib
-import datetime
-import time
 from ftplib import FTP
 
 from consts import FTP_MAX_RECURSE_LEVEL, FTP_USER_DEFAULT, FTP_PASS_DEFAULT
-from utils import show_message_box
-from providers.base_provider import StorageProvider
-
 from dateutil import parser as dateutil_parser
-
+from providers.base_provider import StorageProvider
+from utils import show_message_box
 
 TEMP_OUTPUT = []
+
+
 def _ftp_dir_collector_callback(line):
     global TEMP_OUTPUT
     TEMP_OUTPUT.append(line)
+
 
 # Took this function from https://github.com/codebynumbers/ftpretty/blob/master/ftpretty.py
 def split_file_info(fileinfo):
@@ -113,8 +113,10 @@ def split_file_info(fileinfo):
             })
     return files
 
+
 def is_directory(entry):
     return entry.get("is_directory")
+
 
 def is_file_or_dir_ok(entry):
     name = entry.get("name")
@@ -158,6 +160,7 @@ def yield_fetch_dir(ftp_conn, cwd="/", max_recurse_level=FTP_MAX_RECURSE_LEVEL, 
     for f in queue_process:
         if is_directory(f):
             yield from yield_fetch_dir(ftp_conn, cwd=f.get("full_path"), max_recurse_level=max_recurse_level, recurse_level=recurse_level)
+
 
 class FTPStorageProvider(StorageProvider):
     NODE_BATCH_UPDATE_COUNT = 10
@@ -206,4 +209,3 @@ class FTPStorageProvider(StorageProvider):
         if not url_path:
             url_path = "/"
         return url_path
-
