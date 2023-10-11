@@ -3,7 +3,7 @@ import tempfile
 import subprocess
 import time
 
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 
 from utils import show_message_box, extract_domain, decode_data
 from nodefs import FSNode, parse_dirlist_line

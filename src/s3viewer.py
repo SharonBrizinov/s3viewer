@@ -1,10 +1,10 @@
 import os
 import sys
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
-from PyQt5.QtWidgets import QTreeWidgetItem, QApplication, QSpacerItem, QSizePolicy, QFrame
-from PyQt5.QtGui import QIcon
+from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
+from PyQt6.QtWidgets import QTreeWidgetItem, QApplication, QSpacerItem, QSizePolicy, QFrame
+from PyQt6.QtGui import QIcon
 
 from utils import *
 from nodefs import *
@@ -145,7 +145,7 @@ class Ui_MainWindow(QObject):
 
         # Separator
         self.separatorLine = QFrame()
-        self.separatorLine.setFrameShape(QFrame.HLine)
+        self.separatorLine.setFrameShape(QFrame.Shape.HLine)
         self.verticalLayout.addWidget(self.separatorLine)
         #####################################
 
@@ -188,11 +188,11 @@ class Ui_MainWindow(QObject):
         self.treeWidget.headerItem().setText(1, "Size")
         self.treeWidget.headerItem().setText(2, "Date Modified")
         self.treeWidget.headerItem().setText(3, "Downloaded")
-        self.treeWidget.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
-        self.treeWidget.header().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
-        self.treeWidget.header().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)
-        self.treeWidget.header().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)
-        self.treeWidget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.treeWidget.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self.treeWidget.header().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self.treeWidget.header().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self.treeWidget.header().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self.treeWidget.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.horizontalLayout_4.addWidget(self.treeWidget)
         #####################################
 
@@ -657,4 +657,4 @@ if __name__ == "__main__":
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
     MainWindow.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

@@ -5,7 +5,7 @@ import urllib
 from urllib.parse import urlparse
 
 import requests
-from PyQt5 import QtWidgets
+from PyQt6 import QtWidgets
 
 from consts import USER_AGENT, DOWNLOAD_MIN_CHUNK_SIZE
 
@@ -46,7 +46,7 @@ def download_file(url, filename, report_hook):
         raise Exception("Download error: unknown scheme")
 
 
-def show_message_box(msg, alert_type=QtWidgets.QMessageBox.Warning):
+def show_message_box(msg, alert_type=QtWidgets.QMessageBox.warning):
     msg_box = QtWidgets.QMessageBox()
     msg_box.setText(msg)
     msg_box.setIcon(alert_type)
